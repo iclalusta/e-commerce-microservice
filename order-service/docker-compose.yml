@@ -1,0 +1,44 @@
+version: '3.8'
+services:
+  # Define the PostgreSQL database service
+  postgres-db:
+    image: postgres:14.1
+    container_name: postgres_db_order
+    environment:
+      POSTGRES_USER: your_postgres_username
+      POSTGRES_PASSWORD: your_postgres_password
+      POSTGRES_DB: order_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Define the RabbitMQ service
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: rabbitmq_order
+    ports:
+      - "5672:5672"  # Port for the app to connect
+      - "15672:15672" # Port for the RabbitMQ management UI in your browser
+
+  # Define your Order Service
+  order-service:
+    # Tells Docker Compose to build the image from the Dockerfile in the current directory
+    build: .
+    container_name: order_service_app
+    ports:
+      - "8082:8082"
+    # This makes sure the database and RabbitMQ are started before your app starts
+    depends_on:
+      - postgres-db
+      - rabbitmq
+    # Pass environment variables to your Spring Boot app
+    # This overrides settings in application.properties, which is great for different environments
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-db:5432/order_db
+      - SPRING_DATASOURCE_USERNAME=your_postgres_username
+      - SPRING_DATASOURCE_PASSWORD=your_postgres_password
+      - SPRING_RABBITMQ_HOST=rabbitmq
+
+volumes:
+  postgres_data:
