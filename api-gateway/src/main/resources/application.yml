@@ -1,0 +1,67 @@
+# API Gateway'in Docker konteyneri içinde çalışacağı port
+# Ortam değişkeni (SERVER_PORT) ile bu değer ezilebilir.
+server:
+  port: ${SERVER_PORT:8080}
+
+# Spring Boot uygulama ayarları
+spring:
+  application:
+    name: api-gateway # Servisimizin adı
+  cloud:
+    gateway:
+      # Yönlendirme (Routing) kuralları
+      # DİKKAT: 'uri' alanları 'localhost' yerine docker-compose.yml dosyasındaki servis adlarını kullanır.
+      # Bu, konteynerlerin birbirleriyle Docker'ın sanal ağı üzerinden konuşmasını sağlar.
+      routes:
+        # Authentication Service'e giden istekler
+        - id: auth-service
+          # Ortam değişkeni ile override edilebilir, varsayılan değer docker-compose için ayarlandı.
+          uri: ${AUTH_SERVICE_URI:http://auth-service:8081}
+          predicates:
+            - Path=/auth/**
+
+        # User Service'e giden istekler
+        - id: user-service
+          uri: ${USER_SERVICE_URI:http://user-service:8082}
+          predicates:
+            - Path=/api/users/**
+
+        # Product Service'e giden istekler
+        - id: product-service
+          uri: ${PRODUCT_SERVICE_URI:http://product-service:8083}
+          predicates:
+            - Path=/api/products/**
+
+        # Shopping Cart Service'e giden istekler
+        - id: cart-service
+          uri: ${CART_SERVICE_URI:http://cart-service:8084}
+          predicates:
+            - Path=/api/cart/**
+
+        # Order Management Service'e giden istekler
+        - id: order-service
+          uri: ${ORDER_SERVICE_URI:http://order-service:8085}
+          predicates:
+            - Path=/api/orders/**
+
+# JWT Doğrulama için kullanılacak gizli anahtar
+jwt:
+  # BU DEĞER KESİNLİKLE ORTAM DEĞİŞKENİ (JWT_SECRET) İLE DIŞARIDAN VERİLMELİDİR.
+  # docker-compose.yml dosyasının 'environment' bölümünde bu değişkeni tanımlayacağız.
+  # Varsayılan değer sadece yerel testler içindir ve güvenli değildir.
+  secret: ${JWT_SECRET:BuCokCokGizliBirAnahtarOlmalidirVeKimseylePaylasilmamalidir123!@#$}
+
+# Monitoring için Actuator endpoint'lerini açığa çıkarma ayarı
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics,prometheus,loggers" # Hangi endpoint'lerin görünür olacağı
+  tracing:
+    sampling:
+      probability: 1.0 # Gelen tüm isteklerin izlenmesi için (geliştirme ortamında kullanışlı)
+
+# Log deseninde traceId ve spanId'yi göstermek için
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
