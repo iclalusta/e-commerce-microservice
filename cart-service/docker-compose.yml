@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: cart_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - microservice_network
+
+
+  cart-service:
+    build: .
+    container_name: cart_service_app
+    ports:
+      - "8084:8084"
+    environment:
+      - CART_SERVICE_PORT=8084
+      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/cartdb
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - PRODUCT_SERVICE_URL=http://product-service:8083
+      - AUTH_SERVICE_URL=http://auth-service:8081
+    depends_on:
+      - mongodb
+    networks:
+      - microservice_network
+
+volumes:
+  mongodb_data:
+
+networks:
+  microservice_network:
+    driver: bridge
