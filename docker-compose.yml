@@ -31,7 +31,7 @@ services:
       - auth-service
       - user-service
       # - product-service # Uncomment when Product Service is added
-      # - cart-service    # Uncomment when Cart Service is added
+      - cart-service
       # - order-service   # Uncomment when Order Service is added
     networks:
       - microservice_network # Tüm servisler aynı ağda
@@ -140,19 +140,49 @@ services:
   #   networks:
   #     - microservice_network
 
-  # cart-service:
-  #   build:
-  #     context: ./cart-service
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8084:8084"
-  #   environment:
-  #     - CART_SERVICE_PORT=8084
-  #     - AUTH_SERVICE_URL=http://auth-service:8081
-  #   depends_on:
-  #     - auth-service
-  #   networks:
-  #     - microservice_network
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - microservice_network
+
+  cart-mongodb:
+    image: mongo:latest
+    container_name: cart_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - cart_mongodb_data:/data/db
+    networks:
+      - microservice_network
+
+  cart-service:
+    build:
+      context: ./cart-service
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8084"
+    environment:
+      - CART_SERVICE_PORT=8084
+      - SPRING_DATA_MONGODB_URI=mongodb://cart-mongodb:27017/cartdb
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - PRODUCT_SERVICE_URL=http://product-service:8083
+      - AUTH_SERVICE_URL=http://auth-service:8081
+    depends_on:
+      - cart-mongodb
+      - rabbitmq
+      - auth-service
+    networks:
+      - microservice_network
 
   # order-service:
   #   build:
@@ -174,6 +204,7 @@ services:
 volumes:
   auth_db_data: # Auth Servisi veritabanı için kalıcı depolama
   user_db_data: # User Servisi veritabanı için kalıcı depolama
+  cart_mongodb_data: # Cart Servisi MongoDB verisi
   # product_db_data: # Ürün servisi veritabanı için (eğer varsa)
 
 networks:
