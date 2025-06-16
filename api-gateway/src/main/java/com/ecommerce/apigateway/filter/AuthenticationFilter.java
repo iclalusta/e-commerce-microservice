@@ -73,7 +73,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             }
 
             // "Bearer " kısmını (7 karakter) atlayarak sadece token'ı al
-            final String token = authHeader //.substring(7);
+            final String token = authHeader; //.substring(7);
 
             try {
                 // 3. Token'ı doğrula ve içindeki bilgileri (claims) al
