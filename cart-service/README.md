@@ -35,10 +35,20 @@ It also includes a service definition for the Cart Service itself. When started
 via Docker Compose, the application will be available on port `8084`.
 
 The container uses environment variables to override defaults defined in
-`application.properties`. Notably `CART_SERVICE_PORT`,
-`SPRING_DATA_MONGODB_URI`, `SPRING_RABBITMQ_HOST`, `SPRING_RABBITMQ_PORT`,
-`SPRING_RABBITMQ_USERNAME`, `SPRING_RABBITMQ_PASSWORD`, `PRODUCT_SERVICE_URL`
-and `AUTH_SERVICE_URL` can be supplied when running the service.
+`application.properties`. Commonly used variables include:
+
+| Variable | Description |
+|----------|-------------|
+| `CART_SERVICE_PORT` | Port that the application will listen on. |
+| `SPRING_DATA_MONGODB_URI` | Connection URI for MongoDB. |
+| `SPRING_RABBITMQ_HOST` | RabbitMQ host name. |
+| `SPRING_RABBITMQ_PORT` | RabbitMQ port. |
+| `SPRING_RABBITMQ_USERNAME` | RabbitMQ username. |
+| `SPRING_RABBITMQ_PASSWORD` | RabbitMQ password. |
+| `PRODUCT_SERVICE_URL` | Base URL of the Product Service. |
+| `AUTH_SERVICE_URL` | Base URL of the Auth Service. |
+
+These variables can be supplied when running the service.
 
 To build and run the container directly:
 
