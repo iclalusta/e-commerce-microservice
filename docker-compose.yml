@@ -140,19 +140,17 @@ services:
   #   networks:
   #     - microservice_network
 
-  # cart-service:
-  #   build:
-  #     context: ./cart-service
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8084:8084"
-  #   environment:
-  #     - CART_SERVICE_PORT=8084
-  #     - AUTH_SERVICE_URL=http://auth-service:8081
-  #   depends_on:
-  #     - auth-service
-  #   networks:
-  #     - microservice_network
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - microservice_network
 
   # order-service:
   #   build:

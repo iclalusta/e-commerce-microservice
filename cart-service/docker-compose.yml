@@ -10,17 +10,6 @@ services:
     networks:
       - microservice_network
 
-  rabbitmq:
-    image: rabbitmq:management
-    container_name: cart_rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    networks:
-      - microservice_network
 
   cart-service:
     build: .
@@ -38,7 +27,6 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8081
     depends_on:
       - mongodb
-      - rabbitmq
     networks:
       - microservice_network
 
