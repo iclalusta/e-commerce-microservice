@@ -1,167 +1,94 @@
-version: '3.8' # Docker Compose sürümünü belirtir (uyarıyı gidermek istersen bu satırı silebilirsin)
+version: '3.8'
 
 services:
-  # ----------------------------------------
-  # 1. API Gateway Servisi
-  # ----------------------------------------
+  # 1. API Gateway Service
   api-gateway:
     build:
-      context: ./api-gateway # API Gateway'in Dockerfile'ının bulunduğu dizin
-      dockerfile: Dockerfile # Dockerfile'ın adı
+      context: ./api-gateway
+      dockerfile: Dockerfile
     ports:
-      - "8080:8080" # Host portu:Konteyner portu (API Gateway'in dışarıya açılacağı port)
+      - "8080:8080"
     environment:
-      # application.yml'daki parametrik değerler için ortam değişkenleri
-      # SERVER_PORT: API Gateway'in konteyner içinde çalışacağı port
-      - SERVER_PORT=8080 
-      # Diğer servislerin URI'ları (docker ağı içindeki servis adları)
-      # Auth Servisi 8081 portunda dinliyor (iç konteyner portu)
+      - SERVER_PORT=8080
       - AUTH_SERVICE_URI=http://auth-service:8081
-      # User Servisi kendi içinde 8080'de dinliyor, ama API Gateway 8082'den ona yönlendiriyor
-      - USER_SERVICE_URI=http://user-service:8080 
-      # Ürün, Sepet ve Sipariş servisleri için placeholder URI'lar
+      - USER_SERVICE_URI=http://user-service:8080
       - PRODUCT_SERVICE_URI=http://product-service:8083
       - CART_SERVICE_URI=http://cart-service:8084
       - ORDER_SERVICE_URI=http://order-service:8085
-      # JWT Secret Anahtarı - Auth Servisi ve API Gateway AYNI anahtarı kullanmalı
-      # Bu değer auth-service/config/config.go'daki JWT_SECRET ile AYNI OLMALIDIR!
-      - JWT_SECRET=supersecretjwtkey # DİKKAT: Üretim ortamında daha güvenli bir anahtar kullan!
+      - JWT_SECRET=supersecretjwtkey # WARNING: Use a more secure key in production!
     depends_on:
-      # API Gateway'in yönlendirme yapacağı servisler başlamadan kalkmasın
       - auth-service
       - user-service
-      # - product-service # Uncomment when Product Service is added
+#      - product-service
       - cart-service
-      # - order-service   # Uncomment when Order Service is added
+      - order-service
     networks:
-      - microservice_network # Tüm servisler aynı ağda
+      - microservice_network
 
-  # ----------------------------------------
-  # 2. Authentication Servisi
-  # ----------------------------------------
+  # 2. Authentication Service
   auth-service:
     build:
-      context: ./auth-service # Auth Servisi'nin Dockerfile'ının bulunduğu dizin
-      dockerfile: Dockerfile  # Dockerfile'ın adı
+      context: ./auth-service
+      dockerfile: Dockerfile
     ports:
-      - "8081:8081" # Host portu:Konteyner portu (Dışarıdan erişim için)
+      - "8081:8081"
     environment:
-      # Auth Servisi'nin kendi ortam değişkenleri
       - AUTH_SERVICE_PORT=8081
-      - AUTH_DB_HOST=auth-db # Docker ağı içinde veritabanı servis adı
-      - AUTH_DB_PORT=5432    # Docker'daki varsayılan PostgreSQL portu
+      - AUTH_DB_HOST=auth-db
+      - AUTH_DB_PORT=5432
       - AUTH_DB_USER=authuser
       - AUTH_DB_PASSWORD=authpassword
       - AUTH_DB_NAME=authdb
-      # JWT Secret Anahtarı - API Gateway'deki JWT_SECRET ile AYNI OLMALI
-      - JWT_SECRET=supersecretjwtkey # DİKKAT: Üretim ortamında daha güvenli bir anahtar kullan!
-      # Auth Servisi'nin User Servisi'ne ulaşacağı adres (Docker ağı içinde)
-      - USER_SERVICE_URL=http://user-service:8080 
+      - JWT_SECRET=supersecretjwtkey # WARNING: Must be the same as in api-gateway!
+      - USER_SERVICE_URL=http://user-service:8080
     depends_on:
-      - auth-db # Auth Servisi başlamadan önce veritabanı hazır olmalı
+      - auth-db
     networks:
       - microservice_network
 
-  # ----------------------------------------
-  # 3. User Servisi
-  # ----------------------------------------
+  # 3. User Service
   user-service:
     build:
-      context: ./user-service # User Servisi'nin Dockerfile'ının bulunduğu dizin
-      dockerfile: Dockerfile  # Dockerfile'ın adı
-    # User Servisi için dışarıya açılan port 8082, çünkü API Gateway 8082'ye yönlendiriyor.
-    # Konteynerin kendi içinde çalıştığı port 8080.
+      context: ./user-service
+      dockerfile: Dockerfile
     ports:
-      - "8082:8080" # Host portu:Konteyner portu
+      - "8082:8080"
     environment:
-      # User Servisi'nin kendi ortam değişkenleri
-      - USER_SERVICE_PORT=8080 # User Servisi'nin konteyner içinde çalışacağı port
-      - DB_HOST=user-db        # Docker ağı içinde veritabanı servis adı
-      - DB_PORT=5432           # Docker'daki varsayılan PostgreSQL portu
+      - USER_SERVICE_PORT=8080
+      - DB_HOST=user-db
+      - DB_PORT=5432
       - DB_USER=user
       - DB_PASSWORD=password
       - DB_NAME=userdb
-      # User Servisi'nin Auth Servisi'ne ulaşacağı adres (Docker ağı içinde)
-      - AUTH_SERVICE_URL=http://auth-service:8081 
+      - AUTH_SERVICE_URL=http://auth-service:8081
     depends_on:
-      - user-db     # User Servisi başlamadan önce veritabanı hazır olmalı
-      - auth-service # User Servisi, token doğrulaması için Auth Servisi'ne bağımlı
+      - user-db
+      - auth-service
     networks:
       - microservice_network
 
-  # ----------------------------------------
-  # 4. Veritabanı Servisleri
-  # ----------------------------------------
-  auth-db:
-    image: postgres:13 # PostgreSQL veritabanı imajı
-    environment:
-      # PostgreSQL için ortam değişkenleri
-      - POSTGRES_USER=authuser
-      - POSTGRES_PASSWORD=authpassword
-      - POSTGRES_DB=authdb
-    # Not: Bu port sadece Auth Servis tarafından dahili ağda 5432'den erişilecek.
-    # Dışarıya açmaya gerek yok, ancak debug için açılabilir:
-    # - "5433:5432" # Host portu (çakışmaması için farklı):Konteyner portu
-    volumes:
-      - auth_db_data:/var/lib/postgresql/data # Verilerin kalıcı olması için volume
-    networks:
-      - microservice_network
+#  # 4. Product Service (Enabled)
+#  product-service:
+#    build:
+#      context: ./product-service # Assuming this directory exists
+#      dockerfile: Dockerfile   # Assuming you create a Dockerfile here
+#    ports:
+#      - "8083:8083"
+#    environment:
+#      - PRODUCT_SERVICE_PORT=8083
+#      - AUTH_SERVICE_URL=http://auth-service:8081
+#      - DB_HOST=product-db
+#      - DB_PORT=5432
+#      - DB_USER=productuser
+#      - DB_PASSWORD=productpassword
+#      - DB_NAME=productdb
+#    depends_on:
+#      - auth-service
+#      - product-db
+#    networks:
+#      - microservice_network
 
-  user-db:
-    image: postgres:13
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=userdb
-    # Not: Bu port sadece User Servis tarafından dahili ağda 5432'den erişilecek.
-    # Dışarıya açmaya gerek yok, ancak debug için açılabilir:
-    # - "5432:5432" # Host portu:Konteyner portu
-    volumes:
-      - user_db_data:/var/lib/postgresql/data
-    networks:
-      - microservice_network
-
-  # ----------------------------------------
-  # 5. Diğer Servisler (Placeholder'lar)
-  # ----------------------------------------
-  # product-service:
-  #   build:
-  #     context: ./product-service
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8083:8083"
-  #   environment:
-  #     - PRODUCT_SERVICE_PORT=8083
-  #     - AUTH_SERVICE_URL=http://auth-service:8081
-  #     # product-db varsayımları buraya gelecek
-  #   depends_on:
-  #     - auth-service
-  #     # - product-db
-  #   networks:
-  #     - microservice_network
-
-  rabbitmq:
-    image: rabbitmq:management
-    container_name: rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    networks:
-      - microservice_network
-
-  cart-mongodb:
-    image: mongo:latest
-    container_name: cart_mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - cart_mongodb_data:/data/db
-    networks:
-      - microservice_network
-
+  # 5. Cart Service
   cart-service:
     build:
       context: ./cart-service
@@ -181,32 +108,105 @@ services:
       - cart-mongodb
       - rabbitmq
       - auth-service
+#      - product-service
     networks:
       - microservice_network
 
-  # order-service:
-  #   build:
-  #     context: ./order-service
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8085:8085"
-  #   environment:
-  #     - ORDER_SERVICE_PORT=8085
-  #     - AUTH_SERVICE_URL=http://auth-service:8081
-  #   depends_on:
-  #     - auth-service
-  #   networks:
-  #     - microservice_network
+  # 6. Order Service (Enabled)
+  order-service:
+    build:
+      context: ./order-service # Assuming this directory exists
+      dockerfile: Dockerfile  # Assuming you create a Dockerfile here
+    ports:
+      - "8085:8085"
+    environment:
+      - ORDER_SERVICE_PORT=8085
+      - AUTH_SERVICE_URL=http://auth-service:8081
+      - DB_HOST=order-db
+      - DB_PORT=5432
+      - DB_USER=orderuser
+      - DB_PASSWORD=orderpassword
+      - DB_NAME=orderdb
+    depends_on:
+      - auth-service
+      - order-db
+    networks:
+      - microservice_network
 
-# ----------------------------------------
-# Volumes ve Ağ Tanımları
-# ----------------------------------------
+  # Database Services
+  auth-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=authuser
+      - POSTGRES_PASSWORD=authpassword
+      - POSTGRES_DB=authdb
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    networks:
+      - microservice_network
+
+  user-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=userdb
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - microservice_network
+
+#  product-db:
+#    image: postgres:13
+#    environment:
+#      - POSTGRES_USER=productuser
+#      - POSTGRES_PASSWORD=productpassword
+#      - POSTGRES_DB=productdb
+#    volumes:
+#      - product_db_data:/var/lib/postgresql/data
+#    networks:
+#      - microservice_network
+
+  order-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=orderuser
+      - POSTGRES_PASSWORD=orderpassword
+      - POSTGRES_DB=orderdb
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    networks:
+      - microservice_network
+
+  cart-mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - cart_mongodb_data:/data/db
+    networks:
+      - microservice_network
+
+  # Messaging Service
+  rabbitmq:
+    image: rabbitmq:management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - microservice_network
+
+# Volumes and Network Definitions
 volumes:
-  auth_db_data: # Auth Servisi veritabanı için kalıcı depolama
-  user_db_data: # User Servisi veritabanı için kalıcı depolama
-  cart_mongodb_data: # Cart Servisi MongoDB verisi
-  # product_db_data: # Ürün servisi veritabanı için (eğer varsa)
+  auth_db_data:
+  user_db_data:
+#  product_db_data:
+  order_db_data:
+  cart_mongodb_data:
 
 networks:
-  microservice_network: # Tüm servislerin iletişim kuracağı ortak ağ
-    driver: bridge # Varsayılan ağ sürücüsü
+  microservice_network:
+    driver: bridge
