@@ -1,25 +1,28 @@
-# Adım 1: Projeyi derlemek için Maven ve JDK içeren bir "build" ortamı kullanıyoruz.
+# Stage 1: Build with Maven
 FROM maven:3.8.5-openjdk-17 AS build
 
-# Proje dosyalarını konteynerin içine kopyalıyoruz.
 WORKDIR /app
-COPY . .
 
-# Maven kullanarak projeyi derleyip çalıştırılabilir .jar dosyasını oluşturuyoruz.
-RUN mvn clean package -DskipTests
+# Copy the POM file and download dependencies
+COPY pom.xml .
+RUN mvn dependency:go-offline
 
-# Adım 2: Sadece uygulamayı çalıştırmak için daha küçük bir Java ortamı kullanıyoruz.
-# Bu, son imajımızın boyutunu önemli ölçüde küçültür.
+# Copy the rest of the application source code
+COPY src ./src
+
+# Package the application
+RUN mvn package -DskipTests
+
+# Stage 2: Create the final image
 FROM openjdk:17-jdk-slim
 
-# Çalışma dizinini ayarlıyoruz.
 WORKDIR /app
 
-# Derlenmiş .jar dosyasını build ortamından bu yeni ortama kopyalıyoruz.
-COPY --from=build /app/target/api-gateway-0.0.1-SNAPSHOT.jar app.jar
+# Copy the JAR file from the build stage
+COPY --from=build /app/target/*.jar app.jar
 
-# API Gateway'in çalışacağı 8080 portunu dışarıya açıyoruz.
+# Expose the port the app runs on
 EXPOSE 8080
 
-# Konteyner başladığında çalıştırılacak varsayılan komut.
-ENTRYPOINT ["java", "-jar", "/app.jar"]
+# Run the JAR file
+ENTRYPOINT ["java","-jar","app.jar"]
