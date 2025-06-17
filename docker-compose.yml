@@ -22,8 +22,6 @@ services:
 #      - product-service
       - cart-service
       - order-service
-    networks:
-      - microservice_network
 
   # 2. Authentication Service
   auth-service:
@@ -43,8 +41,7 @@ services:
       - USER_SERVICE_URL=http://user-service:8080
     depends_on:
       - auth-db
-    networks:
-      - microservice_network
+
 
   # 3. User Service
   user-service:
@@ -64,8 +61,7 @@ services:
     depends_on:
       - user-db
       - auth-service
-    networks:
-      - microservice_network
+
 
 #  # 4. Product Service (Enabled)
 #  product-service:
@@ -109,8 +105,7 @@ services:
       - rabbitmq
       - auth-service
 #      - product-service
-    networks:
-      - microservice_network
+
 
   # 6. Order Service (Enabled)
   order-service:
@@ -122,16 +117,26 @@ services:
     environment:
       - ORDER_SERVICE_PORT=8085
       - AUTH_SERVICE_URL=http://auth-service:8081
-      - DB_HOST=order-db
-      - DB_PORT=5432
-      - DB_USER=orderuser
-      - DB_PASSWORD=orderpassword
-      - DB_NAME=orderdb
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://order-db:5432/orderdb
+      - SPRING_DATASOURCE_USERNAME=orderuser
+      - SPRING_DATASOURCE_PASSWORD=orderpassword
     depends_on:
       - auth-service
       - order-db
-    networks:
-      - microservice_network
+
+  # 6. Order Service (Enabled)
+  payment-service:
+    build:
+      context: ./payment-service # Assuming this directory exists
+      dockerfile: Dockerfile  # Assuming you create a Dockerfile here
+    ports:
+      - "8086:8086"
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8081
+      - DB_URL=jdbc:mysql://payment-db:3306/paymentdb
+      - DB_USERNAME=root
+      - DB_PASSWORD=EInDcm29pE
+
 
   # Database Services
   auth-db:
@@ -142,8 +147,7 @@ services:
       - POSTGRES_DB=authdb
     volumes:
       - auth_db_data:/var/lib/postgresql/data
-    networks:
-      - microservice_network
+
 
   user-db:
     image: postgres:13
@@ -153,8 +157,7 @@ services:
       - POSTGRES_DB=userdb
     volumes:
       - user_db_data:/var/lib/postgresql/data
-    networks:
-      - microservice_network
+
 
 #  product-db:
 #    image: postgres:13
@@ -175,8 +178,22 @@ services:
       - POSTGRES_DB=orderdb
     volumes:
       - order_db_data:/var/lib/postgresql/data
-    networks:
-      - microservice_network
+    ports:
+      - "5436:5432"
+
+  payment-db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=EInDcm29pE
+      - MYSQL_DATABASE=paymentdb
+      # If you want a non-root app user as well, uncomment the next two lines:
+      # - MYSQL_USER=orderuser
+      # - MYSQL_PASSWORD=orderpassword
+    volumes:
+      - payment_db_data:/var/lib/mysql
+    ports:
+      - "3308:3306"                   # hostPort:containerPort (optional)
+
 
   cart-mongodb:
     image: mongo:latest
@@ -184,8 +201,7 @@ services:
       - "27017:27017"
     volumes:
       - cart_mongodb_data:/data/db
-    networks:
-      - microservice_network
+
 
   # Messaging Service
   rabbitmq:
@@ -196,17 +212,13 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-    networks:
-      - microservice_network
+
 
 # Volumes and Network Definitions
 volumes:
   auth_db_data:
   user_db_data:
+  payment_db_data:
 #  product_db_data:
   order_db_data:
   cart_mongodb_data:
-
-networks:
-  microservice_network:
-    driver: bridge
