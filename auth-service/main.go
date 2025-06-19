@@ -17,7 +17,7 @@ func main() {
 		log.Fatalf("Yapılandırma yüklenemedi: %v", err)
 	}
 
-	db, err := database.Connect(cfg.DBConnectionString)
+	db, err := database.Connect(cfg)
 	if err != nil {
 		log.Fatalf("Veritabanına bağlanılamadı: %v", err)
 	}
@@ -26,16 +26,11 @@ func main() {
 	r := mux.NewRouter()
 	authHandler := handlers.NewAuthHandler(db, cfg.JWTSecret)
 
-	// `/auth` önekine sahip bir alt router oluştur
 	authRouter := r.PathPrefix("/auth").Subrouter()
-
-	// Rotaları tanımla
+	authRouter.HandleFunc("/register", authHandler.Register).Methods("POST")
 	authRouter.HandleFunc("/login", authHandler.Login).Methods("POST")
-	authRouter.HandleFunc("/validate", authHandler.ValidateToken).Methods("GET") // Validate endpoint'i
 
 	port := "8081"
 	log.Printf("Auth service %s portunda başlatılıyor...", port)
-	if err := http.ListenAndServe(":"+port, r); err != nil {
-		log.Fatalf("Sunucu başlatılamadı: %v", err)
-	}
+	log.Fatal(http.ListenAndServe(":"+port, r))
 }

@@ -1,96 +1,70 @@
 package services
 
 import (
-	"auth-service/database"
-	"auth-service/models"
-	"fmt"
+	"database/sql"
+	"errors"
 	"time"
+	"auth-service/models"
 
-	jwt "github.com/golang-jwt/jwt/v5" // Using v5 of go-jwt
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthService struct {
-	db        *database.DB
-	jwtSecret string
+	DB        *sql.DB
+	JWTSecret string
 }
 
-func NewAuthService(db *database.DB, jwtSecret string) *AuthService {
-	return &AuthService{db: db, jwtSecret: jwtSecret}
+func NewAuthService(db *sql.DB, jwtSecret string) *AuthService {
+	return &AuthService{DB: db, JWTSecret: jwtSecret}
 }
 
-// Register registers a new user in the auth database.
-func (s *AuthService) Register(name, email, hashedPassword string) (int, error) {
-	user := &models.AuthUser{
-		Name:         name,
-		Email:        email,
-		PasswordHash: hashedPassword,
-	}
-	id, err := s.db.InsertAuthUser(user)
+func (s *AuthService) Register(req *models.RegisterRequest) (*models.AuthUser, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return 0, fmt.Errorf("service failed to register user: %w", err)
+		return nil, err
 	}
-	return id, nil
-}
 
-// AuthenticateUser checks user credentials and returns the user if valid.
-func (s *AuthService) AuthenticateUser(email, password string) (*models.AuthUser, error) {
-	user, err := s.db.GetAuthUserByEmail(email)
+	authUser := &models.AuthUser{
+		Name:         req.Name,
+		Email:        req.Email,
+		PasswordHash: string(hashedPassword),
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	query := `INSERT INTO auth_users (name, email, password_hash, created_at, updated_at) VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	err = s.DB.QueryRow(query, authUser.Name, authUser.Email, authUser.PasswordHash, authUser.CreatedAt, authUser.UpdatedAt).Scan(&authUser.ID)
 	if err != nil {
-		return nil, fmt.Errorf("service failed to get user by email: %w", err)
-	}
-	if user == nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return nil, fmt.Errorf("invalid credentials")
-	}
-	return user, nil
+	return authUser, nil
 }
 
-// GetUserByEmail retrieves an auth user by email (used for registration check).
-func (s *AuthService) GetUserByEmail(email string) (*models.AuthUser, error) {
-	user, err := s.db.GetAuthUserByEmail(email)
+func (s *AuthService) Login(req *models.LoginRequest) (string, error) {
+	authUser := &models.AuthUser{}
+	query := `SELECT id, email, password_hash FROM auth_users WHERE email = $1`
+	err := s.DB.QueryRow(query, req.Email).Scan(&authUser.ID, &authUser.Email, &authUser.PasswordHash)
 	if err != nil {
-		return nil, fmt.Errorf("service failed to get user by email: %w", err)
+		if err == sql.ErrNoRows {
+			return "", errors.New("geçersiz e-posta veya şifre")
+		}
+		return "", err
 	}
-	return user, nil
-}
 
-// GenerateToken generates a JWT token for the authenticated user.
-func (s *AuthService) GenerateToken(userID int, email, name string) (string, error) {
+	err = bcrypt.CompareHashAndPassword([]byte(authUser.PasswordHash), []byte(req.Password))
+	if err != nil {
+		return "", errors.New("geçersiz e-posta veya şifre")
+	}
+
 	claims := jwt.MapClaims{
-		"user_id": userID,
-		"email":   email,
-		"name":    name,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(), // Token expires in 24 hours
-		"iss":     "auth-service",                        // Issuer
+		"sub":   authUser.ID,
+		"email": authUser.Email,
+		"name":  authUser.Name,
+		"exp":   time.Now().Add(time.Hour * 72).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(s.jwtSecret))
-	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %w", err)
-	}
-	return tokenString, nil
-}
 
-// ValidateToken validates a JWT token and returns its claims.
-func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Verify the signing method
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(s.jwtSecret), nil
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("token validation error: %w", err)
-	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, nil
-	}
-	return nil, fmt.Errorf("invalid token")
+	return token.SignedString([]byte(s.JWTSecret))
 }

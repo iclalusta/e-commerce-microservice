@@ -1,73 +1,71 @@
 package handlers
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
-	"strings"
 	"auth-service/models"
 	"auth-service/services"
-
-	"github.com/golang-jwt/jwt/v5"
 )
 
-// AuthHandler, veritabanı bağlantısını ve JWT anahtarını tutar.
 type AuthHandler struct {
-	AuthService *services.AuthService
+	service *services.AuthService
 }
 
-// NewAuthHandler, yeni bir AuthHandler örneği oluşturur.
 func NewAuthHandler(db *sql.DB, jwtSecret string) *AuthHandler {
 	return &AuthHandler{
-		AuthService: services.NewAuthService(db, jwtSecret),
+		service: services.NewAuthService(db, jwtSecret),
 	}
 }
 
-// Login, kullanıcı girişi yapar ve token döner.
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var creds models.Credentials
-	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	var req models.RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error": "Geçersiz istek"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Login işlemini servise devret
-	// Not: Burada auth-service, user-service'in veritabanına erişiyor.
-	// Bu, "shared database" desenidir. Alternatif olarak HTTP call yapılabilirdi.
-	token, err := h.AuthService.Login(creds.Email, creds.Password)
+	// 1. Auth veritabanına kullanıcıyı kaydet
+	authUser, err := h.service.Register(&req)
 	if err != nil {
-		if err == sql.ErrNoRows || err.Error() == "geçersiz şifre" {
-			http.Error(w, `{"error": "Geçersiz e-posta veya şifre"}`, http.StatusUnauthorized)
-		} else {
-			http.Error(w, `{"error": "Giriş başarısız"}`, http.StatusInternalServerError)
-		}
+		log.Printf("Auth servisinde kayıt hatası: %v", err)
+		http.Error(w, `{"error": "Kullanıcı kaydedilemedi"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// 2. User servisine profil oluşturması için istek gönder
+	userProfileRequest := map[string]string{"name": authUser.Name, "email": authUser.Email}
+	jsonData, _ := json.Marshal(userProfileRequest)
+	
+	// Docker network'ü üzerinden user-service'e istek at
+	resp, err := http.Post("http://user-service:8082/user/create", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil || resp.StatusCode != http.StatusCreated {
+		log.Printf("User servisine istek atılırken hata oluştu: %v", err)
+		// Burada rollback mantığı eklenebilir (auth_users tablosundan silme)
+		http.Error(w, `{"error": "Kullanıcı profili oluşturulamadı"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Kullanıcı başarıyla oluşturuldu"})
+}
+
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	var req models.LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error": "Geçersiz istek"}`, http.StatusBadRequest)
+		return
+	}
+
+	token, err := h.service.Login(&req)
+	if err != nil {
+		http.Error(w, `{"error": "Geçersiz e-posta veya şifre"}`, http.StatusUnauthorized)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"token": token})
-}
-
-// ValidateToken, gelen token'ın geçerliliğini kontrol eder.
-func (h *AuthHandler) ValidateToken(w http.ResponseWriter, r *http.Request) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		http.Error(w, "Authorization header eksik", http.StatusUnauthorized)
-		return
-	}
-
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-	if tokenString == authHeader {
-		http.Error(w, "Bearer token formatı hatalı", http.StatusUnauthorized)
-		return
-	}
-
-	isValid := h.AuthService.ValidateToken(tokenString)
-	if !isValid {
-		http.Error(w, "Geçersiz token", http.StatusUnauthorized)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]bool{"valid": true})
 }

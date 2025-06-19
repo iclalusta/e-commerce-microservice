@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.comcom/joho/godotenv"
+	"github.com/joho/godotenv"
 )
 
 // Config, uygulama yapılandırmasını tutar.
