@@ -1,29 +1,25 @@
 # Stage 1: Build the Go binary
 FROM golang:1.24-alpine AS builder
 
+RUN apk add --no-cache build-base
 WORKDIR /app
 
-# Copy go.mod and go.sum and download dependencies
 COPY go.mod go.sum ./
-RUN go mod tidy
-RUN go mod vendor
+RUN go mod download
 
-# Copy the entire source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o /user-service .
+# Çıktı dosyasına "user-service" adını veriyoruz
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/user-service .
 
 # Stage 2: Create the final, minimal image
 FROM alpine:latest
 
 WORKDIR /root/
+RUN apk add --no-cache ca-certificates
 
-# Copy the compiled binary from the builder stage
-COPY --from=builder /user-service .
+# "user-service" dosyasını kopyalıyoruz
+COPY --from=builder /app/user-service .
 
-# Expose port 8082 for internal communication
-EXPOSE 8082
-
-# The command to run the application
+# "user-service" dosyasını çalıştırıyoruz
 CMD ["./user-service"]

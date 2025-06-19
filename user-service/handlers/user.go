@@ -10,55 +10,49 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// UserHandler, veritabanı bağlantısını tutar.
 type UserHandler struct {
-	UserService *services.UserService
+	service *services.UserService
 }
 
-// NewUserHandler, yeni bir UserHandler örneği oluşturur.
 func NewUserHandler(db *sql.DB) *UserHandler {
 	return &UserHandler{
-		UserService: services.NewUserService(db),
+		service: services.NewUserService(db),
 	}
 }
 
-// RegisterUser, yeni bir kullanıcı kaydeder.
-func (h *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
-	var user models.User
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		http.Error(w, `{"error": "Geçersiz istek gövdesi"}`, http.StatusBadRequest)
+// CreateUser, auth-service'ten gelen dahili istek üzerine kullanıcı profili oluşturur.
+func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	var req models.UserCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error": "Geçersiz istek"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Kullanıcıyı kaydetme işlemini servise devret
-	createdUser, err := h.UserService.RegisterUser(&user)
+	user, err := h.service.CreateUser(&req)
 	if err != nil {
-		// Burada daha detaylı hata yönetimi yapılabilir (örn: email zaten var)
-		http.Error(w, `{"error": "Kullanıcı kaydedilemedi"}`, http.StatusInternalServerError)
+		http.Error(w, `{"error": "Kullanıcı profili oluşturulamadı"}`, http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(createdUser)
+	json.NewEncoder(w).Encode(user.ToResponse())
 }
 
-// GetUserByEmail, bir kullanıcıyı email adresine göre bulur.
-// Bu endpoint, auth-service tarafından login işlemi için kullanılır.
 func (h *UserHandler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	email := vars["email"]
 
-	user, err := h.UserService.GetUserByEmail(email)
+	user, err := h.service.GetUserByEmail(email)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, `{"error": "Kullanıcı bulunamadı"}`, http.StatusNotFound)
-		} else {
-			http.Error(w, `{"error": "Sunucu hatası"}`, http.StatusInternalServerError)
+			return
 		}
+		http.Error(w, `{"error": "Sunucu hatası"}`, http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(user.ToResponse())
 }
