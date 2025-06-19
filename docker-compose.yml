@@ -1,171 +1,92 @@
-version: '3.8' # Docker Compose sürümünü belirtir (uyarıyı gidermek istersen bu satırı silebilirsin)
+version: '3.8'
 
 services:
-  # ----------------------------------------
-  # 1. API Gateway Servisi
-  # ----------------------------------------
+  # 1. API Gateway (Spring Boot) - Öncelikli Yapılandırma
   api-gateway:
     build:
-      context: ./api-gateway # API Gateway'in Dockerfile'ının bulunduğu dizin
-      dockerfile: Dockerfile # Dockerfile'ın adı
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    restart: on-failure
     ports:
-      - "8080:8080" # Host portu:Konteyner portu (API Gateway'in dışarıya açılacağı port)
+      - "8080:8080" # Dış dünyaya açılan tek kapı
     environment:
-      # application.yml'daki parametrik değerler için ortam değişkenleri
-      # SERVER_PORT: API Gateway'in konteyner içinde çalışacağı port
-      - SERVER_PORT=8080 
-      # Diğer servislerin URI'ları (docker ağı içindeki servis adları)
-      # Auth Servisi 8081 portunda dinliyor (iç konteyner portu)
+      # Öncelikli dosyadan alınan JWT anahtarı
+      - JWT_SECRET=your-super-secret-key-that-is-long-and-secure
+      # Diğer servislerle iletişim için ikinci dosyadan alınan URI'lar
+      - SERVER_PORT=8080
       - AUTH_SERVICE_URI=http://auth-service:8081
-      # User Servisi kendi içinde 8080'de dinliyor, ama API Gateway 8082'den ona yönlendiriyor
-      - USER_SERVICE_URI=http://user-service:8080 
-      # Ürün, Sepet ve Sipariş servisleri için placeholder URI'lar
-      - PRODUCT_SERVICE_URI=http://product-service:8083
+      - USER_SERVICE_URI=http://user-service:8082
+      - PRODUCT_SERVICE_URI=http://product-service:8083 # Henüz eklenmedi ama gelecekte kullanılabilir
       - CART_SERVICE_URI=http://cart-service:8084
       - ORDER_SERVICE_URI=http://order-service:8085
-      # JWT Secret Anahtarı - Auth Servisi ve API Gateway AYNI anahtarı kullanmalı
-      # Bu değer auth-service/config/config.go'daki JWT_SECRET ile AYNI OLMALIDIR!
-      - JWT_SECRET=supersecretjwtkey # DİKKAT: Üretim ortamında daha güvenli bir anahtar kullan!
+      - PAYMENT_SERVICE_URI=http://payment-service:8086
+    networks:
+      - ecommerce-net
     depends_on:
-      # API Gateway'in yönlendirme yapacağı servisler başlamadan kalkmasın
       - auth-service
       - user-service
-      # - product-service # Uncomment when Product Service is added
       - cart-service
-      # - order-service   # Uncomment when Order Service is added
-    networks:
-      - microservice_network # Tüm servisler aynı ağda
+      - order-service
+      - payment-service
 
-  # ----------------------------------------
-  # 2. Authentication Servisi
-  # ----------------------------------------
+  # 2. Auth Service (Go) - Öncelikli Yapılandırma
   auth-service:
     build:
-      context: ./auth-service # Auth Servisi'nin Dockerfile'ının bulunduğu dizin
-      dockerfile: Dockerfile  # Dockerfile'ın adı
-    ports:
-      - "8081:8081" # Host portu:Konteyner portu (Dışarıdan erişim için)
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    restart: on-failure
+    ports: # Dahili iletişim için porta gerek yok ama hata ayıklama için eklenebilir.
+      - "8081:8081"
     environment:
-      # Auth Servisi'nin kendi ortam değişkenleri
+      # Öncelikli dosyadan alınan veritabanı bağlantı bilgileri
+      - DB_HOST=postgres_db
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+      - DB_NAME=ecommerce
+      - DB_PORT=5432
+      # Öncelikli dosyadan alınan JWT anahtarı
+      - JWT_SECRET=your-super-secret-key-that-is-long-and-secure
+      # Diğer servislerle iletişim için eklenen değişkenler
       - AUTH_SERVICE_PORT=8081
-      - AUTH_DB_HOST=auth-db # Docker ağı içinde veritabanı servis adı
-      - AUTH_DB_PORT=5432    # Docker'daki varsayılan PostgreSQL portu
-      - AUTH_DB_USER=authuser
-      - AUTH_DB_PASSWORD=authpassword
-      - AUTH_DB_NAME=authdb
-      # JWT Secret Anahtarı - API Gateway'deki JWT_SECRET ile AYNI OLMALI
-      - JWT_SECRET=supersecretjwtkey # DİKKAT: Üretim ortamında daha güvenli bir anahtar kullan!
-      # Auth Servisi'nin User Servisi'ne ulaşacağı adres (Docker ağı içinde)
-      - USER_SERVICE_URL=http://user-service:8080 
-    depends_on:
-      - auth-db # Auth Servisi başlamadan önce veritabanı hazır olmalı
+      - USER_SERVICE_URL=http://user-service:8082
     networks:
-      - microservice_network
+      - ecommerce-net
+    depends_on:
+      - postgres_db
 
-  # ----------------------------------------
-  # 3. User Servisi
-  # ----------------------------------------
+  # 3. User Service (Go) - Öncelikli Yapılandırma
   user-service:
     build:
-      context: ./user-service # User Servisi'nin Dockerfile'ının bulunduğu dizin
-      dockerfile: Dockerfile  # Dockerfile'ın adı
-    # User Servisi için dışarıya açılan port 8082, çünkü API Gateway 8082'ye yönlendiriyor.
-    # Konteynerin kendi içinde çalıştığı port 8080.
-    ports:
-      - "8082:8080" # Host portu:Konteyner portu
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    restart: on-failure
+    ports: # Dahili iletişim için porta gerek yok ama hata ayıklama için eklenebilir.
+        - "8082:8082"
     environment:
-      # User Servisi'nin kendi ortam değişkenleri
-      - USER_SERVICE_PORT=8080 # User Servisi'nin konteyner içinde çalışacağı port
-      - DB_HOST=user-db        # Docker ağı içinde veritabanı servis adı
-      - DB_PORT=5432           # Docker'daki varsayılan PostgreSQL portu
-      - DB_USER=user
-      - DB_PASSWORD=password
-      - DB_NAME=userdb
-      # User Servisi'nin Auth Servisi'ne ulaşacağı adres (Docker ağı içinde)
-      - AUTH_SERVICE_URL=http://auth-service:8081 
+      # Öncelikli dosyadan alınan veritabanı bağlantı bilgileri
+      - DB_HOST=postgres_db
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+      - DB_NAME=ecommerce
+      - DB_PORT=5432
+      # Diğer servislerle iletişim için eklenen değişkenler
+      - USER_SERVICE_PORT=8082
+      - AUTH_SERVICE_URL=http://auth-service:8081
+    networks:
+      - ecommerce-net
     depends_on:
-      - user-db     # User Servisi başlamadan önce veritabanı hazır olmalı
-      - auth-service # User Servisi, token doğrulaması için Auth Servisi'ne bağımlı
-    networks:
-      - microservice_network
+      - postgres_db
 
-  # ----------------------------------------
-  # 4. Veritabanı Servisleri
-  # ----------------------------------------
-  auth-db:
-    image: postgres:13 # PostgreSQL veritabanı imajı
-    environment:
-      # PostgreSQL için ortam değişkenleri
-      - POSTGRES_USER=authuser
-      - POSTGRES_PASSWORD=authpassword
-      - POSTGRES_DB=authdb
-    # Not: Bu port sadece Auth Servis tarafından dahili ağda 5432'den erişilecek.
-    # Dışarıya açmaya gerek yok, ancak debug için açılabilir:
-    # - "5433:5432" # Host portu (çakışmaması için farklı):Konteyner portu
-    volumes:
-      - auth_db_data:/var/lib/postgresql/data # Verilerin kalıcı olması için volume
-    networks:
-      - microservice_network
-
-  user-db:
-    image: postgres:13
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=userdb
-    # Not: Bu port sadece User Servis tarafından dahili ağda 5432'den erişilecek.
-    # Dışarıya açmaya gerek yok, ancak debug için açılabilir:
-    # - "5432:5432" # Host portu:Konteyner portu
-    volumes:
-      - user_db_data:/var/lib/postgresql/data
-    networks:
-      - microservice_network
-
-  # ----------------------------------------
-  # 5. Diğer Servisler (Placeholder'lar)
-  # ----------------------------------------
-  # product-service:
-  #   build:
-  #     context: ./product-service
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8083:8083"
-  #   environment:
-  #     - PRODUCT_SERVICE_PORT=8083
-  #     - AUTH_SERVICE_URL=http://auth-service:8081
-  #     # product-db varsayımları buraya gelecek
-  #   depends_on:
-  #     - auth-service
-  #     # - product-db
-  #   networks:
-  #     - microservice_network
-
-  rabbitmq:
-    image: rabbitmq:management
-    container_name: rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    networks:
-      - microservice_network
-
-  cart-mongodb:
-    image: mongo:latest
-    container_name: cart_mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - cart_mongodb_data:/data/db
-    networks:
-      - microservice_network
-
+  # 4. Cart Service - İkinci Dosyadan Alınan
   cart-service:
     build:
       context: ./cart-service
       dockerfile: Dockerfile
+    container_name: cart-service
+    restart: on-failure
     ports:
       - "8084:8084"
     environment:
@@ -175,38 +96,132 @@ services:
       - SPRING_RABBITMQ_PORT=5672
       - SPRING_RABBITMQ_USERNAME=guest
       - SPRING_RABBITMQ_PASSWORD=guest
-      - PRODUCT_SERVICE_URL=http://product-service:8083
       - AUTH_SERVICE_URL=http://auth-service:8081
+    networks:
+      - ecommerce-net
     depends_on:
       - cart-mongodb
       - rabbitmq
       - auth-service
+
+  # 5. Order Service - İkinci Dosyadan Alınan
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    restart: on-failure
+    ports:
+      - "8085:8085"
+    environment:
+      - ORDER_SERVICE_PORT=8085
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://order-db:5432/orderdb
+      - SPRING_DATASOURCE_USERNAME=orderuser
+      - SPRING_DATASOURCE_PASSWORD=orderpassword
+      - AUTH_SERVICE_URL=http://auth-service:8081
     networks:
-      - microservice_network
+      - ecommerce-net
+    depends_on:
+      - order-db
+      - auth-service
 
-  # order-service:
-  #   build:
-  #     context: ./order-service
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8085:8085"
-  #   environment:
-  #     - ORDER_SERVICE_PORT=8085
-  #     - AUTH_SERVICE_URL=http://auth-service:8081
-  #   depends_on:
-  #     - auth-service
-  #   networks:
-  #     - microservice_network
+  # 6. Payment Service - İkinci Dosyadan Alınan
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    restart: on-failure
+    ports:
+      - "8086:8086"
+    environment:
+      - DB_URL=jdbc:mysql://payment-db:3306/paymentdb
+      - DB_USERNAME=root
+      - DB_PASSWORD=EInDcm29pE
+      - AUTH_SERVICE_URL=http://auth-service:8081
+    networks:
+      - ecommerce-net
+    depends_on:
+      - payment-db
+      - auth-service
 
-# ----------------------------------------
-# Volumes ve Ağ Tanımları
-# ----------------------------------------
-volumes:
-  auth_db_data: # Auth Servisi veritabanı için kalıcı depolama
-  user_db_data: # User Servisi veritabanı için kalıcı depolama
-  cart_mongodb_data: # Cart Servisi MongoDB verisi
-  # product_db_data: # Ürün servisi veritabanı için (eğer varsa)
+  # --- VERİTABANI VE DİĞER BAĞIMLILIK SERVİSLERİ ---
 
+  # User ve Auth Servisleri için Ortak PostgreSQL Veritabanı (Öncelikli Dosyadan)
+  postgres_db:
+    image: postgres:13
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: ecommerce
+    ports:
+      # Dışarıdan erişim için (isteğe bağlı)
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-net
+
+  # Order Service için PostgreSQL Veritabanı
+  order-db:
+    image: postgres:13
+    container_name: order-db
+    environment:
+      - POSTGRES_USER=orderuser
+      - POSTGRES_PASSWORD=orderpassword
+      - POSTGRES_DB=orderdb
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-net
+
+  # Payment Service için MySQL Veritabanı
+  payment-db:
+    image: mysql:8.0
+    container_name: payment-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=EInDcm29pE
+      - MYSQL_DATABASE=paymentdb
+    volumes:
+      - payment_db_data:/var/lib/mysql
+    networks:
+      - ecommerce-net
+
+  # Cart Service için MongoDB Veritabanı
+  cart-mongodb:
+    image: mongo:latest
+    container_name: cart-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - cart_mongodb_data:/data/db
+    networks:
+      - ecommerce-net
+
+  # Mesajlaşma Servisi (RabbitMQ)
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # AMQP portu
+      - "15672:15672" # Yönetim arayüzü portu
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - ecommerce-net
+
+# --- AĞ VE VOLUME TANIMLAMALARI ---
+
+# Servislerin birbirleriyle konuşacağı ortak ağ
 networks:
-  microservice_network: # Tüm servislerin iletişim kuracağı ortak ağ
-    driver: bridge # Varsayılan ağ sürücüsü
+  ecommerce-net:
+    driver: bridge
+
+# Verilerin kalıcı olmasını sağlayan volume'lar
+volumes:
+  postgres_data:
+  order_db_data:
+  payment_db_data:
+  cart_mongodb_data:
