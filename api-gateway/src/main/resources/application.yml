@@ -12,8 +12,6 @@ spring:
           uri: http://user-service:8082
           predicates:
             - Path=/user/**
-          filters:
-            - AuthenticationFilter
 
         # Auth Service Route (Login public)
         - id: auth-service
