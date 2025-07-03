@@ -24,6 +24,7 @@ services:
     networks:
       - ecommerce-net
     depends_on:
+      - product-service
       - auth-service
       - user-service
       - cart-service
@@ -79,6 +80,24 @@ services:
       - ecommerce-net
     depends_on:
       - postgres_db
+
+  # 5. Order Service - İkinci Dosyadan Alınan
+  product-service:
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    container_name: product-service
+    restart: on-failure
+    ports:
+      - "8083:8083"
+    environment:
+      - PRODUCT_SERVICE_PORT=8083
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://product-db:5432/productdb
+      - SPRING_DATASOURCE_USERNAME=productuser
+      - SPRING_DATASOURCE_PASSWORD=productpassword
+      - AUTH_SERVICE_URL=http://auth-service:8081
+    networks:
+      - ecommerce-net
 
   # 4. Cart Service - İkinci Dosyadan Alınan
   cart-service:
@@ -176,6 +195,19 @@ services:
     networks:
       - ecommerce-net
 
+  # Order Service için PostgreSQL Veritabanı
+  product-db:
+    image: postgres:13
+    container_name: product-db
+    environment:
+      - POSTGRES_USER=productuser
+      - POSTGRES_PASSWORD=productpassword
+      - POSTGRES_DB=productdb
+    volumes:
+      - product_db_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-net
+
   # Payment Service için MySQL Veritabanı
   payment-db:
     image: mysql:8.0
@@ -223,5 +255,6 @@ networks:
 volumes:
   postgres_data:
   order_db_data:
+  product_db_data:
   payment_db_data:
   cart_mongodb_data:
