@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"auth-service/models"
+	"auth-service/services"
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"auth-service/models"
-	"auth-service/services"
+	"strings"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type AuthHandler struct {
@@ -27,7 +31,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Auth veritabanına kullanıcıyı kaydet
 	authUser, err := h.service.Register(&req)
 	if err != nil {
 		log.Printf("Auth servisinde kayıt hatası: %v", err)
@@ -35,22 +38,26 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. User servisine profil oluşturması için istek gönder
+	// Kullanıcı profili oluştur (User Service)
 	userProfileRequest := map[string]string{"name": authUser.Name, "email": authUser.Email}
 	jsonData, _ := json.Marshal(userProfileRequest)
-	
-	// Docker network'ü üzerinden user-service'e istek at
 	resp, err := http.Post("http://user-service:8082/user/create", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil || resp.StatusCode != http.StatusCreated {
 		log.Printf("User servisine istek atılırken hata oluştu: %v", err)
-		// Burada rollback mantığı eklenebilir (auth_users tablosundan silme)
 		http.Error(w, `{"error": "Kullanıcı profili oluşturulamadı"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Token oluştur
+	token, err := h.service.GenerateToken(authUser)
+	if err != nil {
+		http.Error(w, `{"error": "Token oluşturulamadı"}`, http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Kullanıcı başarıyla oluşturuldu"})
+	json.NewEncoder(w).Encode(map[string]string{"token": token})
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -68,4 +75,30 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"token": token})
+}
+
+func (h *AuthHandler) ValidateToken(w http.ResponseWriter, r *http.Request) {
+	tokenString := r.Header.Get("Authorization")
+	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Beklenmeyen imzalama yöntemi")
+		}
+		return []byte(h.service.JWTSecret), nil
+	})
+
+	if err != nil || !token.Valid {
+		http.Error(w, `{"error": "Geçersiz token"}`, http.StatusUnauthorized)
+		return
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		http.Error(w, `{"error": "Token çözümlenemedi"}`, http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(claims)
 }

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"log"
-	"net/http"
 	"auth-service/config"
 	"auth-service/database"
 	"auth-service/handlers"
+	"log"
+	"net/http"
 
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
@@ -29,6 +29,9 @@ func main() {
 	authRouter := r.PathPrefix("/auth").Subrouter()
 	authRouter.HandleFunc("/register", authHandler.Register).Methods("POST")
 	authRouter.HandleFunc("/login", authHandler.Login).Methods("POST")
+	authRouter.HandleFunc("/register", authHandler.Register).Methods("POST")
+	authRouter.HandleFunc("/login", authHandler.Login).Methods("POST")
+	authRouter.HandleFunc("/validate", authHandler.ValidateToken).Methods("POST") // yeni eklendi
 
 	port := "8081"
 	log.Printf("Auth service %s portunda başlatılıyor...", port)

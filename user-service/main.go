@@ -29,7 +29,8 @@ func main() {
 	userRouter := r.PathPrefix("/user").Subrouter()
 	// Bu endpoint dışarıya açık değil, servisler arası iletişim için.
 	userRouter.HandleFunc("/create", userHandler.CreateUser).Methods("POST")
-	userRouter.HandleFunc("/email/{email}", userHandler.GetUserByEmail).Methods("GET")
+	userRouter.HandleFunc("/all", userHandler.GetAllUsers).Methods("GET")  // yeni eklendi
+	userRouter.HandleFunc("/{id}", userHandler.GetUserByID).Methods("GET") // yeni eklendi
 
 	port := "8082"
 	log.Printf("User service %s portunda başlatılıyor...", port)

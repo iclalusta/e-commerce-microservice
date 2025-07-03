@@ -1,10 +1,10 @@
 package services
 
 import (
+	"auth-service/models"
 	"database/sql"
 	"errors"
 	"time"
-	"auth-service/models"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -66,5 +66,16 @@ func (s *AuthService) Login(req *models.LoginRequest) (string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
+	return token.SignedString([]byte(s.JWTSecret))
+}
+
+func (s *AuthService) GenerateToken(authUser *models.AuthUser) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":   authUser.ID,
+		"email": authUser.Email,
+		"name":  authUser.Name,
+		"exp":   time.Now().Add(time.Hour * 72).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.JWTSecret))
 }

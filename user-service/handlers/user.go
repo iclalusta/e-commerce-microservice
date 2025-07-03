@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"user-service/models"
 	"user-service/services"
 
@@ -39,11 +40,16 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user.ToResponse())
 }
 
-func (h *UserHandler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
+func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	email := vars["email"]
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, `{"error": "Geçersiz ID"}`, http.StatusBadRequest)
+		return
+	}
 
-	user, err := h.service.GetUserByEmail(email)
+	user, err := h.service.GetUserByID(id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, `{"error": "Kullanıcı bulunamadı"}`, http.StatusNotFound)
@@ -53,6 +59,19 @@ func (h *UserHandler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user.ToResponse())
+}
+
+func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.service.GetAllUsers()
+	if err != nil {
+		http.Error(w, `{"error": "Sunucu hatası"}`, http.StatusInternalServerError)
+		return
+	}
+
+	var responses []models.UserResponse
+	for _, user := range users {
+		responses = append(responses, user.ToResponse())
+	}
+	json.NewEncoder(w).Encode(responses)
 }
