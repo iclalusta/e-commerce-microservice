@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+body {
+  background: linear-gradient(120deg, #f6f8fa 60%, #e0e7ff 100%);
+  font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.auth-container {
+  background: #fff;
+  padding: 2.2rem 2.7rem;
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(37,99,235,0.09);
+  width: 100%;
+  max-width: 370px;
+  transition: box-shadow 0.18s cubic-bezier(.4,0,.2,1);
+}
+.auth-tabs {
+  display: flex;
+  margin-bottom: 1.7rem;
+  gap: 0.2rem;
+}
+.auth-tabs button {
+  flex: 1;
+  padding: 0.8rem 0;
+  border: none;
+  background: #e0e7ff;
+  color: #2563eb;
+  font-size: 1.08rem;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  font-weight: 600;
+  transition: background 0.18s, color 0.18s;
+}
+.auth-tabs button.active {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.13);
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+.auth-form.hidden {
+  display: none;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+.form-group label {
+  margin-bottom: 0.3rem;
+  font-size: 0.98rem;
+  color: #555;
+  font-weight: 500;
+}
+.form-group input {
+  padding: 0.7rem;
+  border: 1.5px solid #e0e7ff;
+  border-radius: 7px;
+  font-size: 1.05rem;
+  background: #f8fafc;
+  font-family: inherit;
+  transition: border 0.18s, box-shadow 0.18s;
+}
+.form-group input:focus {
+  border: 1.5px solid #2563eb;
+  outline: none;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.09);
+}
+button[type="submit"] {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 0.8rem;
+  border-radius: 7px;
+  font-size: 1.08rem;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.18s;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.09);
+}
+button[type="submit"]:hover {
+  background: #f59e42;
+  color: #fff;
+  transform: scale(1.04);
+}
+.error-message {
+  color: #e74c3c;
+  font-size: 1.05rem;
+  min-height: 1.2em;
+  margin-top: -0.5rem;
+  text-align: center;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+#spinnerContainer {
+  margin-top: 1.2rem;
+  display: flex;
+  justify-content: center;
+}
+@media (max-width: 500px) {
+  .auth-container {
+    padding: 1.2rem 0.5rem;
+    max-width: 98vw;
+  }
+  .auth-tabs button {
+    font-size: 1rem;
+    padding: 0.7rem 0;
+  }
+} 

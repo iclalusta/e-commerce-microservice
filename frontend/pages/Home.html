@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Home - Products</title>
+  <link rel="stylesheet" href="../assets/styles/main.css" />
+</head>
+<body>
+  <div id="headerContainer"></div>
+  <main>
+    <div id="productGrid" class="product-grid"></div>
+    <div id="spinnerContainer"></div>
+    <div id="errorContainer" class="error-message"></div>
+  </main>
+  <footer>
+    <div>E-Shop &mdash; Modern E-Commerce Experience</div>
+    <div style="font-size:0.97rem;margin-top:0.3em;">&copy; 2024 E-Shop. All rights reserved.</div>
+  </footer>
+  <script src="../utils/api.js"></script>
+  <script src="../components/Header.js"></script>
+  <script src="../components/ProductCard.js"></script>
+  <script src="../components/Spinner.js"></script>
+  <script src="../components/Modal.js"></script>
+  <script>
+    // Redirect to login if not authenticated
+    if (!localStorage.getItem('jwt_token')) {
+      window.location.href = 'Login.html';
+    }
+    // Render header
+    document.getElementById('headerContainer').innerHTML = window.Header.render('home');
+    // Fetch and render products
+    const grid = document.getElementById('productGrid');
+    const spinner = document.getElementById('spinnerContainer');
+    const error = document.getElementById('errorContainer');
+    async function loadProducts() {
+      spinner.innerHTML = window.Spinner.render();
+      error.textContent = '';
+      try {
+        const products = await window.api.get('/api/product');
+        spinner.innerHTML = '';
+        if (!products || !products.length) {
+          grid.innerHTML = '<div class="empty-message">No products found.</div>';
+          return;
+        }
+        grid.innerHTML = products.map(p => window.ProductCard.render(p)).join('');
+        // Add click handlers
+        document.querySelectorAll('.product-card').forEach(card => {
+          card.onclick = () => {
+            window.location.href = `Product.html?id=${card.dataset.id}`;
+          };
+        });
+        // Add to cart buttons
+        document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            window.Modal.show('Add to cart feature coming in next step!', { confirmText: 'OK' });
+          };
+        });
+      } catch (err) {
+        spinner.innerHTML = '';
+        error.textContent = err;
+      }
+    }
+    loadProducts();
+  </script>
+</body>
+</html> 

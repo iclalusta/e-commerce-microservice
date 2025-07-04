@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order History</title>
+  <link rel="stylesheet" href="../assets/styles/main.css" />
+</head>
+<body>
+  <div id="headerContainer"></div>
+  <main>
+    <div class="orders-container">
+      <h2>Your Orders</h2>
+      <div id="ordersList"></div>
+      <div id="spinnerContainer"></div>
+      <div id="errorContainer" class="error-message"></div>
+    </div>
+  </main>
+  <script src="../utils/api.js"></script>
+  <script src="../components/Header.js"></script>
+  <script src="../components/Spinner.js"></script>
+  <script src="../components/Modal.js"></script>
+  <script>
+    // Redirect to login if not authenticated
+    if (!localStorage.getItem('jwt_token')) {
+      window.location.href = 'Login.html';
+    }
+    document.getElementById('headerContainer').innerHTML = window.Header.render('orders');
+    const userId = localStorage.getItem('user_id');
+    const ordersList = document.getElementById('ordersList');
+    const spinner = document.getElementById('spinnerContainer');
+    const error = document.getElementById('errorContainer');
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleString();
+    }
+    async function loadOrders() {
+      spinner.innerHTML = window.Spinner.render();
+      error.textContent = '';
+      try {
+        const orders = await window.api.get(`/api/orders?userId=${userId}`);
+        spinner.innerHTML = '';
+        if (!orders || !orders.length) {
+          ordersList.innerHTML = '<div class="empty-message">No orders found.</div>';
+          return;
+        }
+        ordersList.innerHTML = `
+          <div class="orders-list">
+            ${orders.map(order => `
+              <div class="order-row" data-id="${order.id}">
+                <div class="order-id">Order #${order.id}</div>
+                <div class="order-date">${formatDate(order.date)}</div>
+                <div class="order-status">${order.status || 'Placed'}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        document.querySelectorAll('.order-row').forEach(row => {
+          row.onclick = () => {
+            window.location.href = `OrderDetail.html?id=${row.dataset.id}`;
+          };
+        });
+      } catch (err) {
+        spinner.innerHTML = '';
+        error.textContent = err;
+      }
+    }
+    loadOrders();
+  </script>
+</body>
+</html> 

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Details</title>
+  <link rel="stylesheet" href="../assets/styles/main.css" />
+</head>
+<body>
+  <div id="headerContainer"></div>
+  <main>
+    <div id="productDetailContainer" class="product-detail-container"></div>
+    <div id="spinnerContainer"></div>
+    <div id="errorContainer" class="error-message"></div>
+  </main>
+  <script src="../utils/api.js"></script>
+  <script src="../components/Header.js"></script>
+  <script src="../components/Spinner.js"></script>
+  <script src="../components/Modal.js"></script>
+  <script>
+    // Redirect to login if not authenticated
+    if (!localStorage.getItem('jwt_token')) {
+      window.location.href = 'Login.html';
+    }
+    document.getElementById('headerContainer').innerHTML = window.Header.render();
+    const container = document.getElementById('productDetailContainer');
+    const spinner = document.getElementById('spinnerContainer');
+    const error = document.getElementById('errorContainer');
+    function getProductId() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('id');
+    }
+    async function loadProduct() {
+      spinner.innerHTML = window.Spinner.render();
+      error.textContent = '';
+      const id = getProductId();
+      if (!id) {
+        spinner.innerHTML = '';
+        error.textContent = 'Product not found.';
+        return;
+      }
+      try {
+        const product = await window.api.get(`/api/product/${id}`);
+        spinner.innerHTML = '';
+        container.innerHTML = `
+          <div class="product-detail-card">
+            <img src="${product.imageURL || ''}" alt="${product.name}" />
+            <div class="product-detail-info">
+              <div class="product-detail-name">${product.name}</div>
+              <div class="product-detail-desc">${product.description}</div>
+              <div class="product-detail-price">$${product.price.toFixed(2)}</div>
+              <div class="product-detail-qty">
+                <label for="qtyInput">Quantity:</label>
+                <input type="number" id="qtyInput" min="1" value="1" style="width:60px;" />
+              </div>
+              <button id="addToCartBtn" class="add-to-cart-btn">Add to Cart</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('addToCartBtn').onclick = async () => {
+          const qty = parseInt(document.getElementById('qtyInput').value, 10) || 1;
+          try {
+            spinner.innerHTML = window.Spinner.render();
+            await window.api.post('/api/cart', { productId: product.id, quantity: qty });
+            spinner.innerHTML = '';
+            window.Modal.show('Added to cart!', { confirmText: 'OK' });
+          } catch (err) {
+            spinner.innerHTML = '';
+            window.Modal.show('Failed to add to cart: ' + err, { confirmText: 'OK' });
+          }
+        };
+      } catch (err) {
+        spinner.innerHTML = '';
+        error.textContent = err;
+      }
+    }
+    loadProduct();
+  </script>
+</body>
+</html> 
