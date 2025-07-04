@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import java.math.BigDecimal; // <-- ADD THIS LINE
 
 import java.time.LocalDateTime;
 
@@ -15,12 +16,12 @@ public class Payment {
     private Long id;
 
     private Long orderId;
-    private Double amount;
+    private BigDecimal amount;
     private String status; // PENDING, COMPLETED, FAILED
     private LocalDateTime createdAt;
 
 
-    public Payment(Long id, Long orderId, Double amount, String status, LocalDateTime createdAt) {
+    public Payment(Long id, Long orderId, BigDecimal amount, String status, LocalDateTime createdAt) {
         this.id = id;
         this.orderId = orderId;
         this.amount = amount;
@@ -47,11 +48,11 @@ public class Payment {
         this.orderId = orderId;
     }
 
-    public Double getAmount() {
+    public BigDecimal getAmount() {
         return amount;
     }
 
-    public void setAmount(Double amount) {
+    public void setAmount(BigDecimal amount) {
         this.amount = amount;
     }
 

@@ -16,7 +16,7 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar ./
 
 # Default port
-EXPOSE 8087
+EXPOSE 8083
 
 # Use shell form so the wildcard is expanded by /bin/sh
 ENTRYPOINT ["sh", "-c", "java -jar /app/*.jar"]

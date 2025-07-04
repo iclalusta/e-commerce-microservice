@@ -24,10 +24,11 @@ public class OrderController {
      * It expects order data in the request's body.
      */
     @PostMapping
-    public ResponseEntity<Order> createOrder(@RequestBody OrderRequestDTO orderRequest) {
+    public ResponseEntity<Order> createOrder(@RequestHeader("X-User-Id") Long userId,
+                                             @RequestBody OrderRequestDTO orderRequest) {
         // We will pass the request data to the service layer to handle the business logic.
         // The service will return the newly created and saved order.
-        Order newOrder = orderService.createOrder(orderRequest);
+        Order newOrder = orderService.createOrder(orderRequest,userId);
         // We return the new order and an HTTP status of 201 CREATED.
         return new ResponseEntity<>(newOrder, HttpStatus.CREATED);
     }

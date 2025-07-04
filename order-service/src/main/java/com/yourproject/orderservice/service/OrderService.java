@@ -35,10 +35,10 @@ public class OrderService {
     @Autowired // Injects the RabbitTemplate for sending messages
     private RabbitTemplate rabbitTemplate;
 
-    @Value("${service.url.shopping-cart}")
+    @Value("${CART_SERVICE_URI}")
     private String shoppingCartServiceUrl;
 
-    @Value("${service.url.payment}")
+    @Value("${PAYMENT_SERVICE_URI}")
     private String paymentServiceUrl;
 
     @Value("${rabbitmq.exchange.name}")
@@ -48,23 +48,25 @@ public class OrderService {
 
     @Transactional // This annotation makes the whole method a single database transaction.
                    // If any part fails, all database changes will be rolled back.
-    public Order createOrder(OrderRequestDTO orderRequest) {
+    public Order createOrder(OrderRequestDTO orderRequest, Long userId) {
         CartResponseDTO cart = webClientBuilder.build()
                 .get()
-                .uri(shoppingCartServiceUrl + "/{userId}", orderRequest.getUserId()) // Assuming this endpoint exists
+                // CHANGED: The URI no longer needs the userId parameter here.
+                .uri(shoppingCartServiceUrl + "/api/cart")
+                // ADDED: Set the custom header with the user's ID.
+                .header("X-User-Id", String.valueOf(userId))
                 .retrieve()
                 .bodyToMono(CartResponseDTO.class)
-                .block(); // .block() makes it synchronous. In a fully reactive app, you wouldn't do this.
+                .block(); // .block() makes it synchronous.
 
         if (cart == null || cart.getItems().isEmpty()) {
             throw new IllegalStateException("Shopping cart is empty, cannot create order.");
         }
 
-        // Create the order object from the cart details
         Order newOrder = new Order();
-        newOrder.setUserId(orderRequest.getUserId());
+        newOrder.setUserId(userId); // CHANGED: Used userId parameter
         newOrder.setShippingAddress(orderRequest.getShippingAddress());
-        newOrder.setStatus(OrderStatus.PENDING); // Initial status
+        newOrder.setStatus(getObject().PENDING); // Initial status
 
         // Calculate total amount and add order items
         BigDecimal totalAmount = BigDecimal.ZERO;
@@ -86,11 +88,17 @@ public class OrderService {
         PaymentRequestDTO paymentRequest = new PaymentRequestDTO(savedOrder.getId(), totalAmount);
         PaymentResponseDTO paymentResponse = webClientBuilder.build()
                 .post()
-                .uri(paymentServiceUrl + "/process") 
+                // FIXED: Use the correct path from your PaymentController
+                .uri(paymentServiceUrl + "/api/payments")
                 .bodyValue(paymentRequest)
                 .retrieve()
                 .bodyToMono(PaymentResponseDTO.class)
                 .block();
+
+        System.out.println("*******************");
+        System.out.println(paymentResponse);
+        System.out.println("*****************************************");
+
 
         if (paymentResponse == null || !paymentResponse.isSuccess()) {
             // If payment fails, we throw an exception, and because of @Transactional,
@@ -101,7 +109,6 @@ public class OrderService {
         // If payment succeeded, update order status and save again
         savedOrder.setStatus(OrderStatus.PROCESSING);
         orderRepository.save(savedOrder);
-        
 
         // Step 3: Publish the OrderCreatedEvent to RabbitMQ
         // The routing key "order.created" can be used by RabbitMQ to send the message
@@ -115,12 +122,14 @@ public class OrderService {
                     .map(item -> new OrderItemDTO(item.getProductId(), item.getQuantity(), item.getPriceAtTimeOfOrder()))
                     .collect(Collectors.toList())
         );
-        
-        rabbitTemplate.convertAndSend(exchangeName, routingKey, event);
-        System.out.println("Published OrderCreatedEvent for order ID: " + savedOrder.getId());
-
+        //rabbitTemplate.convertAndSend(exchangeName, routingKey, event);
+        //System.out.println("Published OrderCreatedEvent for order ID: " + savedOrder.getId());
 
         return savedOrder;
+    }
+
+    private static java.lang.Object getObject() {
+        return OrderStatus;
     }
 
     public Optional<Order> findOrderById(Long orderId) {

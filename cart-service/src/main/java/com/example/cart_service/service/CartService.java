@@ -25,7 +25,7 @@ public class CartService {
     private final RestTemplate restTemplate;
     private final RabbitTemplate rabbitTemplate;
 
-    @Value("${product.service.url:http://localhost:8080}")
+    @Value("${product.service.url}")
     private String productServiceUrl;
 
     @Value("${cart.item.added.exchange:cartExchange}")
@@ -67,8 +67,8 @@ public class CartService {
         cart.setLastModifiedDate(LocalDateTime.now());
         Cart saved = cartRepository.save(cart);
 
-        ItemAddedToCartEvent event = new ItemAddedToCartEvent(cartIdentifier, productId, quantity);
-        rabbitTemplate.convertAndSend(itemAddedExchange, itemAddedRoutingKey, event);
+        //ItemAddedToCartEvent event = new ItemAddedToCartEvent(cartIdentifier, productId, quantity);
+        //rabbitTemplate.convertAndSend(itemAddedExchange, itemAddedRoutingKey, event);
 
         return saved;
     }
