@@ -66,7 +66,7 @@ public class OrderService {
         Order newOrder = new Order();
         newOrder.setUserId(userId); // CHANGED: Used userId parameter
         newOrder.setShippingAddress(orderRequest.getShippingAddress());
-        newOrder.setStatus(getObject().PENDING); // Initial status
+        newOrder.setStatus(OrderStatus.PENDING);
 
         // Calculate total amount and add order items
         BigDecimal totalAmount = BigDecimal.ZERO;
@@ -126,10 +126,6 @@ public class OrderService {
         //System.out.println("Published OrderCreatedEvent for order ID: " + savedOrder.getId());
 
         return savedOrder;
-    }
-
-    private static java.lang.Object getObject() {
-        return OrderStatus;
     }
 
     public Optional<Order> findOrderById(Long orderId) {
