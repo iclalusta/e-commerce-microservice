@@ -16,14 +16,15 @@ func NewUserService(db *sql.DB) *UserService {
 
 func (s *UserService) CreateUser(req *models.UserCreateRequest) (*models.User, error) {
 	user := &models.User{
+		ID:        req.ID,
 		Name:      req.Name,
 		Email:     req.Email,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
 
-	query := `INSERT INTO users (name, email, created_at, updated_at) VALUES ($1, $2, $3, $4) RETURNING id`
-	err := s.DB.QueryRow(query, user.Name, user.Email, user.CreatedAt, user.UpdatedAt).Scan(&user.ID)
+	query := `INSERT INTO users (id, name, email, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)`
+	_, err := s.DB.Exec(query, user.ID, user.Name, user.Email, user.CreatedAt, user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

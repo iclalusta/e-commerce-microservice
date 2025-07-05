@@ -1,14 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"net/http"
+	"os"
+	"time"
 	"user-service/config"
 	"user-service/database"
 	"user-service/handlers"
 
-	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -23,16 +24,38 @@ func main() {
 	}
 	defer db.Close()
 
-	r := mux.NewRouter()
+	// GIN LOGGING CONFIG
+	logConfig := gin.LoggerConfig{
+		Formatter: func(param gin.LogFormatterParams) string {
+			return fmt.Sprintf("[User-Service] %s | %s | Status: %d | Latency: %s \nPath: %s\nHeaders:\n%s\n",
+				param.TimeStamp.Format(time.RFC1123),
+				param.Method,
+				param.StatusCode,
+				param.Latency,
+				param.Path,
+				param.Request.Header,
+			)
+		},
+		Output: os.Stdout,
+	}
+	r := gin.New()
+	r.Use(gin.LoggerWithConfig(logConfig), gin.Recovery())
+
 	userHandler := handlers.NewUserHandler(db)
 
-	userRouter := r.PathPrefix("/user").Subrouter()
-	// Bu endpoint dışarıya açık değil, servisler arası iletişim için.
-	userRouter.HandleFunc("/create", userHandler.CreateUser).Methods("POST")
-	userRouter.HandleFunc("/all", userHandler.GetAllUsers).Methods("GET")  // yeni eklendi
-	userRouter.HandleFunc("/{id}", userHandler.GetUserByID).Methods("GET") // yeni eklendi
+	// ROUTES
+	userGroup := r.Group("/api/user")
+	{
+		userGroup.POST("/create", gin.WrapF(userHandler.CreateUser))
+		userGroup.GET("/all", gin.WrapF(userHandler.GetAllUsers))
+		userGroup.GET("/:id", gin.WrapF(userHandler.GetUserByID))
+		userGroup.GET("/me", gin.WrapF(userHandler.GetMe))
+
+	}
 
 	port := "8082"
 	log.Printf("User service %s portunda başlatılıyor...", port)
-	log.Fatal(http.ListenAndServe(":"+port, r))
+	if err := r.Run(":" + port); err != nil {
+		log.Fatalf("Server başlatılamadı: %v", err)
+	}
 }

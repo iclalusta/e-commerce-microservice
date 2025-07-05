@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"user-service/models"
 	"user-service/services"
 
@@ -61,7 +62,6 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(user.ToResponse())
 }
-
 func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.service.GetAllUsers()
 	if err != nil {
@@ -74,4 +74,30 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 		responses = append(responses, user.ToResponse())
 	}
 	json.NewEncoder(w).Encode(responses)
+}
+func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	userIDHeader := r.Header.Get("X-User-Id")
+	if userIDHeader == "" {
+		http.Error(w, `{"error": "X-User-Id header'ı eksik"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// 🧼 Trim whitespace gibi şeyleri temizle
+	userIDHeader = strings.TrimSpace(userIDHeader)
+
+	// 🔢 String → Int dönüşümü
+	userID, err := strconv.Atoi(userIDHeader)
+	if err != nil {
+		http.Error(w, `{"error": "Geçersiz kullanıcı ID formatı"}`, http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.service.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, `{"error": "Kullanıcı bulunamadı"}`, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user.ToResponse())
 }

@@ -26,9 +26,7 @@ func main() {
 	r := mux.NewRouter()
 	authHandler := handlers.NewAuthHandler(db, cfg.JWTSecret)
 
-	authRouter := r.PathPrefix("/auth").Subrouter()
-	authRouter.HandleFunc("/register", authHandler.Register).Methods("POST")
-	authRouter.HandleFunc("/login", authHandler.Login).Methods("POST")
+	authRouter := r.PathPrefix("/api/auth").Subrouter()
 	authRouter.HandleFunc("/register", authHandler.Register).Methods("POST")
 	authRouter.HandleFunc("/login", authHandler.Login).Methods("POST")
 	authRouter.HandleFunc("/validate", authHandler.ValidateToken).Methods("POST") // yeni eklendi
