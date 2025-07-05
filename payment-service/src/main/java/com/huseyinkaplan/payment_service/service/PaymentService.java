@@ -22,12 +22,7 @@ public class PaymentService {
         payment.setAmount(request.getAmount());
         payment.setCreatedAt(LocalDateTime.now());
 
-        // Simülasyon: ödeme %90 ihtimalle başarılı
-        if (Math.random() < 0.9) {
-            payment.setStatus("COMPLETED");
-        } else {
-            payment.setStatus("FAILED");
-        }
+        payment.setStatus("COMPLETED");
 
         return paymentRepository.save(payment);
     }

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.huseyinkaplan.payment_service.dto.PaymentResponseDTO;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -18,8 +19,14 @@ public class PaymentController {
     private PaymentService paymentService;
 
     @PostMapping
-    public ResponseEntity<Payment> makePayment(@RequestBody PaymentRequest request) {
+    public ResponseEntity<PaymentResponseDTO> makePayment(@RequestBody PaymentRequest request) {
         Payment payment = paymentService.processPayment(request);
-        return ResponseEntity.ok(payment);
+
+        System.out.println("**************************");
+        System.out.println("Payment: success");
+        System.out.println("**************************");
+        PaymentResponseDTO paymentdto = new PaymentResponseDTO(true);
+
+        return ResponseEntity.ok(paymentdto);
     }
 }

@@ -36,8 +36,8 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     // Kimlik doğrulaması gerektirmeyen, halka açık yolların listesi.
     public static final List<String> openApiEndpoints = List.of(
-            "/api/auth/login",
-            "/api/auth/register"
+            "/auth/login",
+            "/auth/register"
             // Not: Ürün listeleme gibi bazı GET isteklerini de buraya ekleyebilirsiniz.
     );
 

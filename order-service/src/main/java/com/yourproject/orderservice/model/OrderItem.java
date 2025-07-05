@@ -1,10 +1,12 @@
 package com.yourproject.orderservice.model;
 
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
 import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.*;
+
 
 @Entity
 @Table(name = "order_items")
@@ -28,5 +30,6 @@ public class OrderItem {
     // The @JoinColumn specifies the foreign key column in the "order_items" table.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id")
+    @JsonIgnoreProperties("orderItems")
     private Order order;
 }

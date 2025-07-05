@@ -8,7 +8,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class OrderRequestDTO {
-    private Long userId;
     private String shippingAddress;
     // In a real app, this would probably be a list of cart items,
     // but we'll keep it simple for now and assume the OrderService will fetch the cart.
