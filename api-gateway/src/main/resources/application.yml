@@ -20,7 +20,7 @@ spring:
         - id: product-service
           uri: http://product-service:8083
           predicates:
-            - Path=/api/product/**
+            - Path=/api/products/**
 
         - id: cart-service
           uri: http://cart-service:8084
