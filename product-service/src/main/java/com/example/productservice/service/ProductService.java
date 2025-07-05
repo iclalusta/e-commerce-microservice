@@ -7,6 +7,9 @@ import com.example.productservice.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+//import com.example.productservice.dto.ProductUpdatedEvent;
+//import org.springframework.amqp.rabbit.core.RabbitTemplate;
+
 
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +17,17 @@ import java.util.Optional;
 @Service
 public class ProductService {
     private final ProductRepository productRepository;
+
+    //@Autowired // Injects the RabbitTemplate for sending messages
+    //private RabbitTemplate rabbitTemplate;
+    //
+    //@Value("${rabbitmq.exchange.name}")
+    //private String exchangeName;
+    //
+    //@Value("${rabbitmq.routing.key}")
+    //private String routingKey;
+
+
 
     @Autowired
     public ProductService(ProductRepository productRepository) {
@@ -45,6 +59,21 @@ public class ProductService {
             throw new InsufficientStockException("Insufficient stock for product id: " + id);
         }
         product.setStock(product.getStock() - quantity);
+
+        //ProductUpdatedEvent event = new ProductUpdatedEvent(
+        //        String description, Long id, String name, BigDecimal price, Integer stock, String category, String imageUrl
+        //        product.getDescription(),
+        //        product.getId(),
+        //        product.getName(),
+        //        product.getPrice(),
+        //        product.getStock(),
+        //        product.getCategory(),
+        //        product.getImageUrl(),
+        //);
+        //
+        //rabbitTemplate.convertAndSend(exchangeName, routingKey, event);
+        //System.out.println("Published enriched OrderCreatedEvent for order ID: " + savedOrder.getId());
+
         return productRepository.save(product);
     }
 

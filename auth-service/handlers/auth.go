@@ -38,17 +38,20 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Kullanıcı profili oluştur (User Service)
-	userProfileRequest := map[string]string{"name": authUser.Name, "email": authUser.Email}
+	// Kullanıcı profili oluştur (User Service) - ID ile birlikte gönderiyoruz!
+	userProfileRequest := map[string]interface{}{
+		"id":    authUser.ID, // ← kritik: aynı ID'yi gönderiyoruz
+		"name":  authUser.Name,
+		"email": authUser.Email,
+	}
 	jsonData, _ := json.Marshal(userProfileRequest)
-	resp, err := http.Post("http://user-service:8082/user/create", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post("http://user-service:8082/api/user/create", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil || resp.StatusCode != http.StatusCreated {
 		log.Printf("User servisine istek atılırken hata oluştu: %v", err)
 		http.Error(w, `{"error": "Kullanıcı profili oluşturulamadı"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Token oluştur
 	token, err := h.service.GenerateToken(authUser)
 	if err != nil {
 		http.Error(w, `{"error": "Token oluşturulamadı"}`, http.StatusInternalServerError)

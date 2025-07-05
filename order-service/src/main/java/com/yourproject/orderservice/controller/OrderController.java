@@ -50,7 +50,7 @@ public class OrderController {
      * Example URL: /api/orders?userId=123
      */
     @GetMapping
-    public ResponseEntity<List<Order>> getOrdersByUserId(@RequestParam Long userId) {
+    public ResponseEntity<List<Order>> getOrdersByUserId(@RequestHeader("X-User-Id") Long userId) {
         // We use the custom method we defined in our OrderRepository (via the service).
         List<Order> orders = orderService.findOrdersByUserId(userId);
         return ResponseEntity.ok(orders);

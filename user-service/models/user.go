@@ -16,6 +16,7 @@ type User struct {
 // UserCreateRequest is the payload for creating a new user profile.
 // This is what Auth Service will send to User Service.
 type UserCreateRequest struct {
+	ID    int    `json:"id"` // ← eklendi
 	Name  string `json:"name" validate:"required,min=2,max=100"`
 	Email string `json:"email" validate:"required,email"`
 }
