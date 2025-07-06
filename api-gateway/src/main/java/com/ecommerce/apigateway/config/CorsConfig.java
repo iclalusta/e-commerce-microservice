@@ -11,17 +11,12 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
-    /**
-     * Bu Bean, API Gateway için global CORS (Cross-Origin Resource Sharing) ayarlarını yapar.
-     * React uygulamamızın (örn: localhost:3778) Gateway'e (localhost:8080) istek atabilmesini sağlar.
-     */
     @Bean
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
 
         // React uygulamasının çalıştığı adrese izin veriyoruz.
-        // Üretime geçtiğinde buraya gerçek domain adınızı yazmanız gerekir.
-        corsConfig.setAllowedOrigins(List.of("http://localhost:3778"));
+        corsConfig.setAllowedOrigins(List.of("http://localhost:5173"));
 
         // İzin verilen HTTP metodları
         corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));

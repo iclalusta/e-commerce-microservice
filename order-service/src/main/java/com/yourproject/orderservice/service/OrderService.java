@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.beans.factory.annotation.Value;
 
+import com.yourproject.orderservice.dto.OrderUpdateDTO;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -35,60 +37,55 @@ public class OrderService {
     @Autowired // Injects the RabbitTemplate for sending messages
     private RabbitTemplate rabbitTemplate;
 
+    @Value("${rabbitmq.exchange.name}")
+    private String exchangeName;
+
+    @Value("${rabbitmq.routing.key}")
+    private String routingKey;
+
     @Value("${CART_SERVICE_URI}")
     private String shoppingCartServiceUrl;
 
     @Value("${PAYMENT_SERVICE_URI}")
     private String paymentServiceUrl;
 
-    @Value("${rabbitmq.exchange.name}")
-    private String exchangeName;
 
-    private String routingKey = "order.created";
-
-    @Transactional // This annotation makes the whole method a single database transaction.
-                   // If any part fails, all database changes will be rolled back.
+    @Transactional
     public Order createOrder(OrderRequestDTO orderRequest, Long userId) {
         CartResponseDTO cart = webClientBuilder.build()
                 .get()
-                // CHANGED: The URI no longer needs the userId parameter here.
                 .uri(shoppingCartServiceUrl + "/api/cart")
-                // ADDED: Set the custom header with the user's ID.
                 .header("X-User-Id", String.valueOf(userId))
                 .retrieve()
                 .bodyToMono(CartResponseDTO.class)
-                .block(); // .block() makes it synchronous.
+                .block();
 
         if (cart == null || cart.getItems().isEmpty()) {
             throw new IllegalStateException("Shopping cart is empty, cannot create order.");
         }
 
         Order newOrder = new Order();
-        newOrder.setUserId(userId); // CHANGED: Used userId parameter
+        newOrder.setUserId(userId);
         newOrder.setShippingAddress(orderRequest.getShippingAddress());
-        newOrder.setStatus(getObject().PENDING); // Initial status
+        newOrder.setStatus(OrderStatus.ISLENIYOR);
 
-        // Calculate total amount and add order items
         BigDecimal totalAmount = BigDecimal.ZERO;
         for (var cartItem : cart.getItems()) {
             OrderItem orderItem = new OrderItem();
             orderItem.setProductId(cartItem.getProductId());
             orderItem.setQuantity(cartItem.getQuantity());
             orderItem.setPriceAtTimeOfOrder(cartItem.getPrice());
-            newOrder.addOrderItem(orderItem); // Using our helper method
+            newOrder.addOrderItem(orderItem);
 
             totalAmount = totalAmount.add(cartItem.getPrice().multiply(new BigDecimal(cartItem.getQuantity())));
         }
         newOrder.setTotalAmount(totalAmount);
 
-        // For now, let's save the order first to get an ID for the payment request
         Order savedOrder = orderRepository.save(newOrder);
 
-        // Step 2: Call the (mock) Payment Service
         PaymentRequestDTO paymentRequest = new PaymentRequestDTO(savedOrder.getId(), totalAmount);
         PaymentResponseDTO paymentResponse = webClientBuilder.build()
                 .post()
-                // FIXED: Use the correct path from your PaymentController
                 .uri(paymentServiceUrl + "/api/payments")
                 .bodyValue(paymentRequest)
                 .retrieve()
@@ -99,38 +96,61 @@ public class OrderService {
         System.out.println(paymentResponse);
         System.out.println("*****************************************");
 
-
         if (paymentResponse == null || !paymentResponse.isSuccess()) {
-            // If payment fails, we throw an exception, and because of @Transactional,
-            // the saved order will be rolled back from the database.
             throw new IllegalStateException("Payment failed, rolling back order creation.");
         }
 
-        // If payment succeeded, update order status and save again
-        savedOrder.setStatus(OrderStatus.PROCESSING);
+        savedOrder.setStatus(OrderStatus.ISLENIYOR);
         orderRepository.save(savedOrder);
 
-        // Step 3: Publish the OrderCreatedEvent to RabbitMQ
-        // The routing key "order.created" can be used by RabbitMQ to send the message
-        // to the correct queues (e.g., for notification and product services).
+        // --- YENİ VE DOĞRU KISIM ---
+        // Gerekli servislerin (ProductService, CartService) kullanması için zengin bir event fırlat
+        List<OrderItemDTO> orderItemsForEvent = savedOrder.getOrderItems().stream()
+                .map(orderItem -> new OrderItemDTO(
+                        orderItem.getProductId(),
+                        orderItem.getQuantity(),
+                        orderItem.getPriceAtTimeOfOrder()))
+                .collect(Collectors.toList());
+
         OrderCreatedEvent event = new OrderCreatedEvent(
-            savedOrder.getId(),
-            savedOrder.getUserId(),
-            savedOrder.getTotalAmount(),
-            // Convert your OrderItem entities to OrderItemDTOs for the event
-            savedOrder.getOrderItems().stream()
-                    .map(item -> new OrderItemDTO(item.getProductId(), item.getQuantity(), item.getPriceAtTimeOfOrder()))
-                    .collect(Collectors.toList())
+                savedOrder.getId(),
+                savedOrder.getUserId(),
+                orderItemsForEvent
         );
-        //rabbitTemplate.convertAndSend(exchangeName, routingKey, event);
-        //System.out.println("Published OrderCreatedEvent for order ID: " + savedOrder.getId());
+
+        rabbitTemplate.convertAndSend(exchangeName, routingKey, event);
+        System.out.println("Published enriched OrderCreatedEvent for order ID: " + savedOrder.getId());
+        // --- YENİ VE DOĞRU KISIM SONU ---
 
         return savedOrder;
     }
 
-    private static java.lang.Object getObject() {
-        return OrderStatus;
+    @Transactional
+    public Order updateOrder(Long orderId, OrderUpdateDTO orderDetails) {
+        // Siparişi ID ile bul, bulunamazsa hata fırlat.
+        Order existingOrder = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
+
+        // Eğer istekte yeni bir kargo adresi varsa, onu güncelle.
+        if (orderDetails.getShippingAddress() != null && !orderDetails.getShippingAddress().isEmpty()) {
+            existingOrder.setShippingAddress(orderDetails.getShippingAddress());
+        }
+
+        // Eğer istekte yeni bir durum varsa, onu güncelle.
+        if (orderDetails.getStatus() != null) {
+            existingOrder.setStatus(orderDetails.getStatus());
+        }
+
+        // Güncellenmiş siparişi kaydet ve döndür.
+        return orderRepository.save(existingOrder);
     }
+
+
+    //bütün orderları getirme
+    public List<Order> findAllOrders() {
+        return orderRepository.findAll();
+    }
+
 
     public Optional<Order> findOrderById(Long orderId) {
         return orderRepository.findById(orderId);

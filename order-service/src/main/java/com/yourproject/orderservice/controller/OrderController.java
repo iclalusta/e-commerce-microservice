@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.yourproject.orderservice.dto.OrderUpdateDTO;
+
+
 import java.util.List;
 
 @RestController // Tells Spring this class will handle REST API requests
@@ -45,14 +48,31 @@ public class OrderController {
                 .orElse(ResponseEntity.notFound().build()); // If not found, return 404 NOT FOUND
     }
 
+    @PutMapping("/{orderId}")
+    public ResponseEntity<Order> updateOrder(@PathVariable Long orderId, @RequestBody OrderUpdateDTO orderDetails) {
+        try {
+            Order updatedOrder = orderService.updateOrder(orderId, orderDetails);
+            return ResponseEntity.ok(updatedOrder);
+        } catch (RuntimeException e) {
+            // Sipariş bulunamazsa 404 Not Found döndürür.
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     /**
      * Endpoint to get all orders for a specific user.
      * Example URL: /api/orders?userId=123
      */
     @GetMapping
-    public ResponseEntity<List<Order>> getOrdersByUserId(@RequestParam Long userId) {
+    public ResponseEntity<List<Order>> getOrdersByUserId(@RequestHeader("X-User-Id") Long userId) {
         // We use the custom method we defined in our OrderRepository (via the service).
         List<Order> orders = orderService.findOrdersByUserId(userId);
         return ResponseEntity.ok(orders);
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<Order>> getAllOrders() {
+        List<Order> allOrders = orderService.findAllOrders();
+        return ResponseEntity.ok(allOrders);
     }
 }

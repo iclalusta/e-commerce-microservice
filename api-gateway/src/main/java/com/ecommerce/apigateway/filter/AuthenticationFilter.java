@@ -21,10 +21,6 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.function.Predicate;
 
-/**
- * Bu global filtre, gelen tüm istekleri yakalar ve JWT tabanlı kimlik doğrulaması yapar.
- * Bu GÜNCELLENMİŞ versiyon, performansı ve dayanıklılığı artırmak için JWT'yi YEREL olarak doğrular.
- */
 @Component
 public class AuthenticationFilter implements GlobalFilter, Ordered {
 
@@ -36,9 +32,8 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     // Kimlik doğrulaması gerektirmeyen, halka açık yolların listesi.
     public static final List<String> openApiEndpoints = List.of(
-            "/auth/login",
-            "/auth/register"
-            // Not: Ürün listeleme gibi bazı GET isteklerini de buraya ekleyebilirsiniz.
+            "/api/auth/login",
+            "/api/auth/register"
     );
 
     @Override
@@ -66,7 +61,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             final String token = authHeader.substring(7);
 
             try {
-                // Token'ı yerel olarak, paylaşılan gizli anahtarla doğruluyoruz.
+                // Token'ı paylaşılan gizli anahtarla doğruluyoruz.
                 Claims claims = Jwts.parserBuilder()
                         .setSigningKey(jwtSecret.getBytes())
                         .build()
@@ -108,7 +103,6 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     private Mono<Void> onError(ServerWebExchange exchange, String errMessage, HttpStatus httpStatus) {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(httpStatus);
-        // Hata mesajını daha anlaşılır JSON formatında döndürelim
         exchange.getResponse().getHeaders().add("Content-Type", "application/json; charset=utf-8");
         String errorJson = "{\"status\":\"error\",\"message\":\"" + errMessage + "\"}";
         logger.warn("İstek reddedildi. Sebep: {}, HTTP Status: {}", errMessage, httpStatus);

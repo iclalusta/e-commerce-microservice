@@ -14,16 +14,22 @@ import com.example.cart_service.model.Cart;
 import com.example.cart_service.model.CartItem;
 import com.example.cart_service.model.ProductDto;
 import com.example.cart_service.repository.CartRepository;
-
 import lombok.RequiredArgsConstructor;
+
+import org.slf4j.Logger; // YENİ
+import org.slf4j.LoggerFactory; // YENİ
+
 
 @Service
 @RequiredArgsConstructor
 public class CartService {
 
+    private static final Logger log = LoggerFactory.getLogger(CartService.class); // YENİ
     private final CartRepository cartRepository;
     private final RestTemplate restTemplate;
     private final RabbitTemplate rabbitTemplate;
+
+
 
     @Value("${product.service.url}")
     private String productServiceUrl;
@@ -117,7 +123,7 @@ public class CartService {
         cartRepository.deleteByCartIdentifier(cartIdentifier);
     }
 
-    public void updateProduct(Long productId, ProductDto update) {
+    /*public void updateProduct(Long productId, ProductDto update) {
         List<Cart> carts = cartRepository.findByItemsProductId(productId);
         for (Cart cart : carts) {
             cart.getItems().forEach(item -> {
@@ -127,6 +133,60 @@ public class CartService {
             });
             cart.setLastModifiedDate(LocalDateTime.now());
             cartRepository.save(cart);
+        }
+    }*/
+
+    public void updateProductInCarts(Long productId, ProductDto productUpdate) {
+        // Bu productId'yi içeren tüm sepetleri bul
+        List<Cart> cartsToUpdate = cartRepository.findByItemsProductId(productId);
+ 
+        if (cartsToUpdate.isEmpty()) {
+            log.info("No carts found containing product ID: {}. No update needed.", productId);
+            return;
+        }
+ 
+        // --- YENİ EKLENEN STOK KONTROL MANTIĞI ---
+        if (productUpdate.getStock() <= 0) {
+            // **Durum 1: Stok SIFIR veya daha az ise, ürünü tüm sepetlerden sil.**
+            log.warn("Stock for product ID: {} is zero or less. Removing this item from all carts.", productId);
+ 
+            for (Cart cart : cartsToUpdate) {
+                // Ürünü sepetin item listesinden predicate kullanarak kaldır
+                boolean removed = cart.getItems().removeIf(item -> item.getProductId().equals(productId));
+ 
+                if (removed) {
+                    log.info("Removed product ID: {} from cart with identifier: {}", productId, cart.getCartIdentifier());
+ 
+                    // Ürün kaldırıldıktan sonra sepetin boş olup olmadığını kontrol et
+                    if (cart.getItems().isEmpty()) {
+                        // Eğer sepet artık boşsa, bu sepeti veritabanından tamamen sil
+                        cartRepository.delete(cart);
+                        log.info("Cart with identifier: {} is now empty and has been deleted.", cart.getCartIdentifier());
+                    } else {
+                        // Eğer sepette başka ürünler varsa, sepetin son halini kaydet
+                        cart.setLastModifiedDate(LocalDateTime.now());
+                        cartRepository.save(cart);
+                    }
+                }
+            }
+        } else {
+            // **Durum 2: Stok VARSA, mevcut mantığı uygula (sadece fiyatı güncelle).**
+            log.info("Stock for product ID: {} is available. Updating price in relevant carts.", productId);
+ 
+            for (Cart cart : cartsToUpdate) {
+                boolean priceUpdated = false;
+                for (CartItem item : cart.getItems()) {
+                    if (item.getProductId().equals(productId)) {
+                        item.setPrice(productUpdate.getPrice()); // Ürünün yeni fiyatını ayarla
+                        priceUpdated = true;
+                    }
+                }
+                if (priceUpdated) {
+                    cart.setLastModifiedDate(LocalDateTime.now());
+                    cartRepository.save(cart);
+                    log.info("Updated price for product ID: {} in cart with identifier: {}", productId, cart.getCartIdentifier());
+                }
+            }
         }
     }
 }

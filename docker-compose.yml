@@ -2,6 +2,14 @@ version: '3.8'
 
 services:
   # 1. API Gateway (Spring Boot) - Öncelikli Yapılandırma
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - ecommerce-net
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -21,6 +29,7 @@ services:
       - CART_SERVICE_URI=http://cart-service:8084
       - ORDER_SERVICE_URI=http://order-service:8085
       - PAYMENT_SERVICE_URI=http://payment-service:8086
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans 
     networks:
       - ecommerce-net
     depends_on:
@@ -30,6 +39,7 @@ services:
       - cart-service
       - order-service
       - payment-service
+      - zipkin
 
   # 2. Auth Service (Go) - Öncelikli Yapılandırma
   auth-service:
@@ -96,8 +106,16 @@ services:
       - SPRING_DATASOURCE_USERNAME=productuser
       - SPRING_DATASOURCE_PASSWORD=productpassword
       - AUTH_SERVICE_URL=http://auth-service:8081
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans 
     networks:
       - ecommerce-net
+    depends_on:
+      - rabbitmq
+      - zipkin
 
   # 4. Cart Service - İkinci Dosyadan Alınan
   cart-service:
@@ -117,12 +135,14 @@ services:
       - SPRING_RABBITMQ_USERNAME=guest
       - SPRING_RABBITMQ_PASSWORD=guest
       - AUTH_SERVICE_URL=http://auth-service:8081
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans 
     networks:
       - ecommerce-net
     depends_on:
       - cart-mongodb
       - rabbitmq
       - auth-service
+      - zipkin
 
   # 5. Order Service - İkinci Dosyadan Alınan
   order-service:
@@ -141,11 +161,20 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8081
       - PAYMENT_SERVICE_URI=http://payment-service:8086
       - CART_SERVICE_URI=http://cart-service:8084
+            # --- EKLENEN SATIRLAR ---
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      # --- EKLENEN SATIRLAR SONU ---
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans 
     networks:
       - ecommerce-net
     depends_on:
       - order-db
       - auth-service
+      - rabbitmq
+      - zipkin
 
   # 6. Payment Service - İkinci Dosyadan Alınan
   payment-service:
@@ -161,11 +190,13 @@ services:
       - DB_USERNAME=root
       - DB_PASSWORD=EInDcm29pE
       - AUTH_SERVICE_URL=http://auth-service:8081
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans 
     networks:
       - ecommerce-net
     depends_on:
       - payment-db
       - auth-service
+      - zipkin
 
   # --- VERİTABANI VE DİĞER BAĞIMLILIK SERVİSLERİ ---
 
@@ -248,7 +279,6 @@ services:
       - ecommerce-net
 
 # --- AĞ VE VOLUME TANIMLAMALARI ---
-
 # Servislerin birbirleriyle konuşacağı ortak ağ
 networks:
   ecommerce-net:
